@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "fields": [
+    {"name": "candidate_id", "type": "string", "required": true},
+    {"name": "reviewer", "type": "string", "required": true},
+    {"name": "decision", "type": "enum", "values": ["inspect", "uncertain", "reject"], "required": true},
+    {"name": "reason_codes", "type": "string_array", "required": true},
+    {"name": "reviewed_at", "type": "datetime", "required": true},
+    {"name": "notes", "type": "string", "required": false}
+  ]
+}

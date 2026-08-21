@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.deps/
+.tmp/
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Runtime output
+logs/
+output/
+outputs/
+tmp/
+cache/
+
+# Large/local geospatial data
+data/raw/
+data/cache/
+data/processed/
+*.tif
+*.tiff
+*.gpkg
+*.pmtiles
+*.parquet
+*.fgb
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+
+# Models
+models/weights/
+*.pt
+*.pth
+*.onnx
+
+# Database
+*.sql.gz
+postgres-data/

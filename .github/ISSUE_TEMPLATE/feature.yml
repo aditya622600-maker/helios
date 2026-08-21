@@ -1,0 +1,28 @@
+name: Feature or workstream task
+description: Plan a scoped implementation with an observable acceptance test.
+title: "[Workstream] "
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What user-visible or integration result should exist?
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Inputs and dependencies
+      description: Contracts, datasets, branches, or upstream outputs required.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use a short checklist with measurable results.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and citations
+      description: Dataset/model links, versions, and expected evaluation evidence.
