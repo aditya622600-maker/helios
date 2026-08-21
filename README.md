@@ -131,6 +131,7 @@ Read the [Person 4 handoff contract](docs/person4/HANDOFF_CONTRACT.md),
 8. Excluded candidates never enter a ranking.
 9. Every top candidate must have component scores, confidence and reason codes.
 10. Quantitative presentation claims must trace to recorded validation results.
+11. Request-only sources are optional enrichment; the cached demo must run from a lawful, reproducible public baseline.
 
 ## Documentation map
 
@@ -139,6 +140,7 @@ Read the [Person 4 handoff contract](docs/person4/HANDOFF_CONTRACT.md),
 - [Team workflow](docs/TEAM_WORKFLOW.md)
 - [Six-person step-by-step execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md)
 - [Data and citations](docs/data/DATA_AND_PROVENANCE.md)
+- [GOBS access finding and public fallback](docs/data/GOBS_ACCESS_AND_FALLBACK.md)
 - [Temporal alignment](docs/data/TEMPORAL_ALIGNMENT.md)
 - [Ranking and validation](docs/evaluation/RANKING_VALIDATION.md)
 - [GeoLibre contract](apps/geolibre/README.md)

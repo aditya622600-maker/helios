@@ -7,13 +7,14 @@
 - clone, install, run CI locally;
 - freeze Kharghar AOI, CRS and reference date;
 - register source manifests and agree on units;
+- submit the GOBS Maharashtra state-file request, record it as optional, and begin the Google Open Buildings v3 plus Temporal v1 fallback immediately;
 - Person 5 freezes contracts and sample fixtures;
 - Persons 2–4 begin from fixtures while Person 1 acquires real data;
 - Person 6 prepares the blind validation rubric and manual-baseline sheet.
 
 ### Hours 2–12
 
-- Person 1 publishes Kharghar buildings, context layers and manifests;
+- Person 1 publishes Kharghar Open Buildings candidates, sampled Temporal heights, context layers and manifests; GOBS enriches them only if received and audited;
 - Person 2 produces spatial, height and proximity features;
 - Person 3 produces solar-yield and economic features;
 - Person 4 produces eligibility, score, rank and stability output;
@@ -57,5 +58,6 @@
 
 - Keep one small sample request and GeoJSON in the repository.
 - Cache only redistributable inputs.
+- If GOBS is unavailable, run the documented Open Buildings v3/Temporal v1 baseline and show the optional-source warning; do not scrape dashboard aggregates.
 - If a live data endpoint fails, demonstrate the recorded source version and manifest.
 - If ML challenger fails, use the deterministic baseline; never hide the result.
