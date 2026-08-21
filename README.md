@@ -102,6 +102,23 @@ Do not scale to thousands of candidates until this single-candidate path works.
 
 See the [six-person execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md) for the complete step-by-step procedure, owned paths, handoffs and non-collision rules.
 
+### Person 4 ranking workstream
+
+The isolated Person 4 implementation accepts separate P2, P3 and confidence tables,
+enforces assumption/version alignment, and returns ranked candidates, deterministic
+explanations, a confidence-calibrated stability report and an optional label-based
+evaluation report.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_person4.py `
+  data\fixtures\person4\person4-request.json `
+  --output output\person4\ranking-bundle.json
+```
+
+Read the [Person 4 handoff contract](docs/person4/HANDOFF_CONTRACT.md),
+[research gap and method](docs/person4/RESEARCH_GAP_AND_METHOD.md) and
+[AI working brief](docs/person4/AI_WORKING_BRIEF.md) before changing ranking behavior.
+
 ## Core engineering rules
 
 1. The contracts in `helios/contracts/` are the team boundary.
