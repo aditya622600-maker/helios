@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from helios.contracts.models import SourceManifest
-from scripts.ingestion.build_p1_fixture import candidate_id, source_record_digest
+from helios.ingestion.identity import candidate_id, source_record_digest
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DIR = ROOT / "data" / "sample" / "source_layers"
