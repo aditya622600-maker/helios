@@ -9,7 +9,10 @@ service = AnalysisService()
 
 @router.post("", response_model=AnalysisRun, status_code=status.HTTP_201_CREATED)
 def create_analysis_run(request: AnalysisRequest) -> AnalysisRun:
-    return service.create(request)
+    try:
+        return service.create(request)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
 
 
 @router.get("/{run_id}", response_model=AnalysisRun)
