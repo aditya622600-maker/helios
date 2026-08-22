@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "project_name": "Helios Kharghar Base GIS",
+  "crs": "EPSG:4326",
+  "layers": [
+    {
+      "id": "aoi_boundary",
+      "name": "Kharghar AOI",
+      "type": "vector",
+      "source": "../../../data/processed/kharghar_aoi.geojson",
+      "attribution": "Helios Spatial Bounding Study",
+      "style": {
+        "stroke": "#e74c3c",
+        "stroke-width": 2,
+        "fill": "none"
+      }
+    },
+    {
+      "id": "roads",
+      "name": "Kharghar Road Network",
+      "type": "vector",
+      "source": "../../../data/processed/kharghar_roads.geojson",
+      "attribution": "OpenStreetMap contributors (ODbL)",
+      "style": {
+        "stroke": "#34495e",
+        "stroke-width": 1.5
+      }
+    },
+    {
+      "id": "buildings",
+      "name": "Kharghar Clean Buildings",
+      "type": "vector",
+      "source": "../../../data/processed/kharghar_buildings_clean.geojson",
+      "attribution": "Google Open Buildings v3 / OSM (ODbL)",
+      "style": {
+        "fill": "#3498db",
+        "fill-opacity": 0.6,
+        "stroke": "#1b4f72"
+      }
+    },
+    {
+      "id": "power",
+      "name": "Kharghar Power Grid",
+      "type": "vector",
+      "source": "../../../data/processed/kharghar_power.geojson",
+      "attribution": "OpenStreetMap contributors (ODbL)",
+      "style": {
+        "circle-color": "#f1c40f",
+        "circle-radius": 4,
+        "circle-stroke": "#000000"
+      }
+    }
+  ]
+}
