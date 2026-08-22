@@ -58,12 +58,14 @@
       pitch: 55,
       bearing: -18,
       maxPitch: 75,
+      projection: { type: 'globe' },
       style: 'https://tiles.openfreemap.org/styles/bright'
     });
     map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
     map.on('load', () => {
       map.addSource('terrain', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, encoding: 'terrarium' });
       map.setTerrain({ source: 'terrain', exaggeration: 1.15 });
+      map.getStyle().layers.filter(layer => /building/i.test(layer.id)).forEach(layer => map.setLayoutProperty(layer.id, 'visibility', 'none'));
       map.addSource('openfreemap', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
       const firstSymbol = map.getStyle().layers.find(layer => layer.type === 'symbol');
       map.addLayer({
@@ -76,20 +78,46 @@
         }
       }, firstSymbol && firstSymbol.id);
       if (location.protocol !== 'file:') {
+        map.addSource('local-buildings-3d', { type: 'geojson', data: './data/osm_buildings_3d.geojson' });
+        map.addLayer({
+          id: 'local-buildings-3d', source: 'local-buildings-3d', type: 'fill-extrusion',
+          paint: {
+            'fill-extrusion-color': '#60a5fa',
+            'fill-extrusion-height': ['coalesce', ['to-number', ['get', 'height_m']], 6],
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': 0.88,
+            'fill-extrusion-vertical-gradient': true
+          }
+        }, firstSymbol && firstSymbol.id);
+        map.addSource('usable-roofs-3d', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({ id: 'usable-roofs-3d', source: 'usable-roofs-3d', type: 'fill-extrusion', paint: { 'fill-extrusion-color': '#0ea5e9', 'fill-extrusion-height': ['+', ['get', 'roof_height_m'], 0.22], 'fill-extrusion-base': ['get', 'roof_height_m'], 'fill-extrusion-opacity': 0.95 } }, firstSymbol && firstSymbol.id);
+        fetch('./data/osm_buildings_3d.geojson').then(response => response.json()).then(data => { all3DBuildings = data; apply3DSelection(selectionFeature); }).catch(() => {});
+        map.setLayoutProperty('osm-buildings', 'visibility', 'visible');
         map.addSource('person1', { type: 'geojson', data: './data/candidate_buildings.geojson' });
         map.addLayer({ id: 'person1-footprints', type: 'line', source: 'person1', paint: { 'line-color': '#fbbf24', 'line-width': 2, 'line-opacity': 0.95 } });
       }
+      map.addSource('aoi-3d', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'aoi-3d-fill', type: 'fill', source: 'aoi-3d', paint: { 'fill-color': '#fef3c7', 'fill-opacity': 0.42 } });
+      map.addLayer({ id: 'aoi-3d-line', type: 'line', source: 'aoi-3d', paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 0.9 } });
       map.on('click', 'osm-buildings', (event) => {
         const p = event.features[0].properties;
         new maplibregl.Popup().setLngLat(event.lngLat).setHTML(`<strong>OpenStreetMap building</strong><br>height: ${p.render_height || 'not tagged'} m<br>base: ${p.render_min_height || 0} m`).addTo(map);
       });
       map.on('mouseenter', 'osm-buildings', () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'osm-buildings', () => { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', 'usable-roofs-3d', event => {
+        const p = event.features[0].properties;
+        map.getCanvas().style.cursor = 'pointer';
+        new maplibregl.Popup({ closeButton: false, closeOnClick: false }).setLngLat(event.lngLat).setHTML(`<strong>Solar rooftop</strong><br>roof area: ${p.roof_area_m2} m²<br>usable rooftop area: ${p.usable_roof_area_m2} m²<br>usable estimate: ${Math.round(USABLE_ROOF_FRACTION * 100)}%`).addTo(map);
+      });
+      map.on('mouseleave', 'usable-roofs-3d', () => { map.getCanvas().style.cursor = ''; document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove()); });
     });
     let selectionMap;
     let selectionMode = null;
     let selectionPoints = [];
     let selectionFeature;
+    let all3DBuildings = null;
+    const USABLE_ROOF_FRACTION = 0.70;
     const selectionStatus = document.getElementById('selectionStatus');
     function showSelectionStatus(text) { selectionStatus.textContent = text; }
     function rectangleFeature(a, b) {
@@ -100,37 +128,125 @@
     function updateSelection(feature) {
       selectionFeature = feature;
       selectionMap.getSource('selection').setData(feature || { type: 'FeatureCollection', features: [] });
+      apply3DSelection(feature);
       const n = feature ? feature.geometry.coordinates[0].length - 1 : 0;
       showSelectionStatus(feature ? `${feature.properties.selection_mode} selected · ${n} corners · ready for analysis` : 'No region selected.');
+    }
+    function apply3DSelection(feature) {
+      if (!map.getLayer('osm-buildings') && !map.getLayer('local-buildings-3d')) return;
+      const baseFilter = ['!=', ['get', 'hide_3d'], true];
+      if (map.getLayer('osm-buildings')) {
+        map.setFilter('osm-buildings', baseFilter);
+        map.setLayoutProperty('osm-buildings', 'visibility', feature ? 'none' : 'visible');
+      }
+      if (all3DBuildings && map.getSource('local-buildings-3d')) {
+        const visible = feature ? all3DBuildings.features.filter(f => featureContainsFeature(feature, f)) : all3DBuildings.features;
+        map.getSource('local-buildings-3d').setData({ type: 'FeatureCollection', features: visible });
+        if (map.getSource('usable-roofs-3d')) map.getSource('usable-roofs-3d').setData({ type: 'FeatureCollection', features: visible.map(toUsableRoof) });
+        map.setLayoutProperty('local-buildings-3d', 'visibility', feature ? 'visible' : 'none');
+        if (map.getLayer('usable-roofs-3d')) map.setLayoutProperty('usable-roofs-3d', 'visibility', feature ? 'visible' : 'none');
+      }
+      if (map.getSource('aoi-3d')) map.getSource('aoi-3d').setData(feature || { type: 'FeatureCollection', features: [] });
+    }
+    function footprintAreaM2(ring) {
+      let area = 0;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) area += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+      const lat = ring.reduce((sum, p) => sum + p[1], 0) / ring.length * Math.PI / 180;
+      return Math.abs(area / 2) * 111320 * Math.cos(lat) * 110540;
+    }
+    function toUsableRoof(feature) {
+      const ring = feature.geometry.coordinates[0];
+      const center = ring.reduce((acc, p) => [acc[0] + p[0] / ring.length, acc[1] + p[1] / ring.length], [0, 0]);
+      const inset = ring.map(p => [center[0] + (p[0] - center[0]) * 0.82, center[1] + (p[1] - center[1]) * 0.82]);
+      const roof = Math.round(footprintAreaM2(ring));
+      return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [inset] }, properties: { ...feature.properties, roof_area_m2: roof, usable_roof_area_m2: Math.round(roof * USABLE_ROOF_FRACTION), roof_height_m: Number(feature.properties.height_m) || 6 } };
+    }
+    function pointInRing(point, ring) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const a = ring[i], b = ring[j];
+        const cross = (point[1] - a[1]) * (b[0] - a[0]) - (point[0] - a[0]) * (b[1] - a[1]);
+        const within = point[0] >= Math.min(a[0], b[0]) && point[0] <= Math.max(a[0], b[0]) && point[1] >= Math.min(a[1], b[1]) && point[1] <= Math.max(a[1], b[1]);
+        if (Math.abs(cross) < 1e-10 && within) return false;
+      }
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+        const crosses = ((yi > point[1]) !== (yj > point[1])) && (point[0] < (xj - xi) * (point[1] - yi) / ((yj - yi) || 1e-12) + xi);
+        if (crosses) inside = !inside;
+      }
+      return inside;
+    }
+    function featureContainsFeature(region, building) {
+      const ring = region.geometry.coordinates[0];
+      const coords = building.geometry.type === 'Polygon' ? building.geometry.coordinates[0] : building.geometry.coordinates[0][0];
+      return coords.every(point => pointInRing(point, ring));
     }
     function finishPolygon() {
       if (selectionPoints.length < 3) return;
       updateSelection({ type: 'Feature', properties: { selection_mode: 'polygon' }, geometry: { type: 'Polygon', coordinates: [[...selectionPoints, selectionPoints[0]]] } });
       selectionMode = null; selectionPoints = [];
+      updateDraft([]);
+    }
+    function updateDraft(points) {
+      if (!selectionMap || !selectionMap.getSource('selection-draft')) return;
+      const features = [];
+      if (points.length >= 2) features.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: points } });
+      points.forEach(point => features.push({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: point } }));
+      selectionMap.getSource('selection-draft').setData({ type: 'FeatureCollection', features });
     }
     function initSelectionMap() {
       if (selectionMap) { selectionMap.resize(); return; }
       selectionMap = new maplibregl.Map({ container: 'selectionMap', center: [73.0697, 19.0468], zoom: 15.4, pitch: 0, style: 'https://tiles.openfreemap.org/styles/bright' });
+      selectionMap.setMaxPitch(0);
+      selectionMap.setMinPitch(0);
+      selectionMap.dragRotate.disable();
+      selectionMap.touchZoomRotate.disableRotation();
       selectionMap.addControl(new maplibregl.NavigationControl(), 'bottom-right');
       selectionMap.on('load', () => {
+        selectionMap.getStyle().layers.filter(layer => /building/i.test(layer.id)).forEach(layer => selectionMap.setLayoutProperty(layer.id, 'visibility', 'none'));
+        selectionMap.addSource('selection-osm-buildings', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
+        selectionMap.addLayer({ id: 'selection-osm-building-fill', source: 'selection-osm-buildings', 'source-layer': 'building', type: 'fill', paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.5 } });
+        selectionMap.addLayer({ id: 'selection-osm-building-line', source: 'selection-osm-buildings', 'source-layer': 'building', type: 'line', paint: { 'line-color': '#1e40af', 'line-width': 1.2 } });
+        selectionMap.addSource('selection-buildings', { type: 'geojson', data: './data/osm_buildings_3d.geojson' });
+        selectionMap.addLayer({ id: 'selection-building-fill', type: 'fill', source: 'selection-buildings', paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.28 } });
+        selectionMap.addLayer({ id: 'selection-building-line', type: 'line', source: 'selection-buildings', paint: { 'line-color': '#1d4ed8', 'line-width': 1 } });
         selectionMap.addSource('selection', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        selectionMap.addSource('selection-draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         selectionMap.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': '#38bdf8', 'fill-opacity': 0.2 } });
         selectionMap.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': '#0284c7', 'line-width': 3 } });
+        selectionMap.addLayer({ id: 'selection-draft-line', type: 'line', source: 'selection-draft', filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [1, 1] } });
+        selectionMap.addLayer({ id: 'selection-draft-points', type: 'circle', source: 'selection-draft', filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#f59e0b', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } });
         selectionMap.on('click', event => {
           if (!selectionMode) return;
           const point = [event.lngLat.lng, event.lngLat.lat];
-          if (selectionMode === 'rectangle' && selectionPoints.length === 1) { updateSelection(rectangleFeature(selectionPoints[0], point)); selectionPoints = []; selectionMode = null; return; }
-          selectionPoints.push(point); showSelectionStatus(`${selectionMode}: ${selectionPoints.length} corner${selectionPoints.length === 1 ? '' : 's'} added · double-click to finish`);
+          if (selectionMode === 'rectangle' && selectionPoints.length === 1) { updateSelection(rectangleFeature(selectionPoints[0], point)); selectionPoints = []; selectionMode = null; updateDraft([]); return; }
+          selectionPoints.push(point); updateDraft(selectionPoints); showSelectionStatus(`${selectionMode}: ${selectionPoints.length} corner${selectionPoints.length === 1 ? '' : 's'} added · double-click to finish`);
         });
+        selectionMap.on('mousemove', event => {
+          if (selectionMode !== 'rectangle' || selectionPoints.length !== 1) return;
+          updateDraft([selectionPoints[0], [event.lngLat.lng, event.lngLat.lat], [selectionPoints[0][0], event.lngLat.lat], selectionPoints[0]]);
+        });
+        selectionMap.on('click', 'selection-building-fill', event => {
+          const p = event.features[0].properties;
+          new maplibregl.Popup().setLngLat(event.lngLat).setHTML(`<strong>Building footprint</strong><br>OSM way: ${p.osm_way_id || 'not available'}<br>height: ${p.height_m || 'not available'} m<br>levels: ${p.levels || 'not available'}<br>source: ${p.source || 'OSM'}`).addTo(selectionMap);
+        });
+        selectionMap.on('click', 'selection-osm-building-fill', event => {
+          const p = event.features[0].properties;
+          new maplibregl.Popup().setLngLat(event.lngLat).setHTML(`<strong>OpenStreetMap building</strong><br>height: ${p.render_height || 'not tagged'} m<br>base: ${p.render_min_height || 0} m<br>source: OpenFreeMap / OSM`).addTo(selectionMap);
+        });
+        selectionMap.on('mouseenter', 'selection-building-fill', () => { selectionMap.getCanvas().style.cursor = 'pointer'; });
+        selectionMap.on('mouseleave', 'selection-building-fill', () => { selectionMap.getCanvas().style.cursor = ''; });
+        selectionMap.on('mouseenter', 'selection-osm-building-fill', () => { selectionMap.getCanvas().style.cursor = 'pointer'; });
+        selectionMap.on('mouseleave', 'selection-osm-building-fill', () => { selectionMap.getCanvas().style.cursor = ''; });
         selectionMap.doubleClickZoom.disable();
         selectionMap.on('dblclick', finishPolygon);
       });
     }
-    document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); map.resize(); });
+    document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); map.resize(); apply3DSelection(selectionFeature); });
     document.getElementById('selectionTab').addEventListener('click', () => { document.getElementById('selectionTab').classList.add('active'); document.getElementById('threeDTab').classList.remove('active'); document.getElementById('threeDControls').hidden = true; document.getElementById('selectionControls').hidden = false; document.getElementById('map').classList.remove('active'); document.getElementById('selectionMap').classList.add('active'); initSelectionMap(); });
-    document.getElementById('rectangleTool').addEventListener('click', () => { selectionMode = 'rectangle'; selectionPoints = []; showSelectionStatus('Rectangle: click the first corner, then the opposite corner.'); });
-    document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; showSelectionStatus('Polygon: click corners, then double-click to finish.'); });
-    document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateSelection(null); });
+    document.getElementById('rectangleTool').addEventListener('click', () => { selectionMode = 'rectangle'; selectionPoints = []; updateDraft([]); showSelectionStatus('Rectangle: click the first corner, then the opposite corner.'); });
+    document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then double-click to finish.'); });
+    document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateDraft([]); updateSelection(null); });
     const pitch = document.getElementById('pitch');
     const pitchValue = document.getElementById('pitchValue');
     pitch.addEventListener('input', () => { pitchValue.value = `${pitch.value}°`; map.setPitch(Number(pitch.value)); });

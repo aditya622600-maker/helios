@@ -1,10 +1,22 @@
 from fastapi import APIRouter, HTTPException, status
 
 from helios.contracts.models import AnalysisRequest, AnalysisRun, RerankRequest
+from helios.pipeline.multimodal import rank_selected_aoi
+from helios.ranking.contracts import P5RankingRequest, RankingBundle
 from helios.pipeline.service import AnalysisService
 
 router = APIRouter(prefix="/analysis-runs", tags=["analysis"])
 service = AnalysisService()
+
+
+@router.post("/multimodal", response_model=RankingBundle)
+def run_multimodal_aoi(payload: dict) -> RankingBundle:
+    """Run the selected AOI through the aligned P2/P3/Person 4 pipeline."""
+    try:
+        request = P5RankingRequest.model_validate(payload["ranking_request"])
+        return rank_selected_aoi(request, payload["aoi"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("", response_model=AnalysisRun, status_code=status.HTTP_201_CREATED)
