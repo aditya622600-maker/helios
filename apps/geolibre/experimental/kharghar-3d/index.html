@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Helios · Kharghar solar scouting</title>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    html, body, #map { height: 100%; margin: 0; }
+    body { background: #0b1220; }
+    #map, #selectionMap { min-height: 620px; }
+    .view { display: none; height: 100%; }
+    .view.active { display: block; }
+    .panel { position: absolute; z-index: 2; top: 16px; left: 16px; max-width: 290px; padding: 14px 16px; border: 1px solid #334155; border-radius: 10px; background: #101827e8; color: #e2e8f0; box-shadow: 0 12px 30px #0006; }
+    h1 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+    p { margin: 4px 0 12px; color: #94a3b8; font-size: 12px; line-height: 1.4; }
+    label { display: block; margin-top: 10px; font-size: 12px; color: #cbd5e1; }
+    input { width: 100%; accent-color: #38bdf8; }
+    .legend { margin-top: 10px; font-size: 11px; color: #94a3b8; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    button { border: 1px solid #475569; border-radius: 6px; padding: 7px 9px; background: #1e293b; color: #e2e8f0; cursor: pointer; font: inherit; font-size: 12px; }
+    button.active, button:hover { border-color: #38bdf8; background: #075985; }
+    .tools { display: flex; gap: 6px; flex-wrap: wrap; }
+    .status { margin-top: 10px; padding: 8px; border-radius: 6px; background: #0f172a; font-size: 11px; color: #cbd5e1; }
+    .maplibregl-popup-content { color: #0f172a; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <aside class="panel" aria-label="Helios map controls">
+    <h1>Helios · Kharghar</h1>
+    <p>Exploratory only · real public sample layers · not an engineering layer</p>
+    <div class="tabs" role="tablist" aria-label="Map views">
+      <button id="threeDTab" class="active" role="tab" aria-selected="true">3D viewer</button>
+      <button id="selectionTab" role="tab" aria-selected="false">Select region</button>
+    </div>
+    <section id="threeDControls">
+    <label for="pitch">Camera pitch <output id="pitchValue">55°</output></label>
+    <input id="pitch" type="range" min="35" max="75" value="55">
+    <label for="terrainExaggeration">Terrain exaggeration <output id="terrainValue">1.15×</output></label>
+    <input id="terrainExaggeration" type="range" min="0.5" max="2.5" step="0.05" value="1.15">
+    <div class="legend">Click a building to inspect its OSM height and base elevation. Yellow outlines are Person 1 candidates when served over HTTP.</div>
+    </section>
+    <section id="selectionControls" hidden>
+      <div class="tools"><button id="rectangleTool">Rectangle</button><button id="polygonTool">Polygon</button><button id="clearSelection">Clear</button></div>
+      <div class="legend">Rectangle: click two opposite corners. Polygon: click each corner, then double-click to finish.</div>
+      <div id="selectionStatus" class="status">No region selected.</div>
+    </section>
+  </aside>
+  <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
+  <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script>
+    const map = new maplibregl.Map({
+      container: 'map',
+      center: [73.0697, 19.0468],
+      zoom: 15.4,
+      pitch: 55,
+      bearing: -18,
+      maxPitch: 75,
+      style: 'https://tiles.openfreemap.org/styles/bright'
+    });
+    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+    map.on('load', () => {
+      map.addSource('terrain', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, encoding: 'terrarium' });
+      map.setTerrain({ source: 'terrain', exaggeration: 1.15 });
+      map.addSource('openfreemap', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
+      const firstSymbol = map.getStyle().layers.find(layer => layer.type === 'symbol');
+      map.addLayer({
+        id: 'osm-buildings', source: 'openfreemap', 'source-layer': 'building', type: 'fill-extrusion', minzoom: 14,
+        filter: ['!=', ['get', 'hide_3d'], true],
+        paint: {
+          'fill-extrusion-color': ['interpolate', ['linear'], ['get', 'render_height'], 0, '#cbd5e1', 30, '#38bdf8', 100, '#6366f1'],
+          'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, ['get', 'render_height']],
+          'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.9, 'fill-extrusion-vertical-gradient': true
+        }
+      }, firstSymbol && firstSymbol.id);
+      if (location.protocol !== 'file:') {
+        map.addSource('person1', { type: 'geojson', data: './data/candidate_buildings.geojson' });
+        map.addLayer({ id: 'person1-footprints', type: 'line', source: 'person1', paint: { 'line-color': '#fbbf24', 'line-width': 2, 'line-opacity': 0.95 } });
+      }
+      map.on('click', 'osm-buildings', (event) => {
+        const p = event.features[0].properties;
+        new maplibregl.Popup().setLngLat(event.lngLat).setHTML(`<strong>OpenStreetMap building</strong><br>height: ${p.render_height || 'not tagged'} m<br>base: ${p.render_min_height || 0} m`).addTo(map);
+      });
+      map.on('mouseenter', 'osm-buildings', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'osm-buildings', () => { map.getCanvas().style.cursor = ''; });
+    });
+    let selectionMap;
+    let selectionMode = null;
+    let selectionPoints = [];
+    let selectionFeature;
+    const selectionStatus = document.getElementById('selectionStatus');
+    function showSelectionStatus(text) { selectionStatus.textContent = text; }
+    function rectangleFeature(a, b) {
+      const west = Math.min(a[0], b[0]), east = Math.max(a[0], b[0]);
+      const south = Math.min(a[1], b[1]), north = Math.max(a[1], b[1]);
+      return { type: 'Feature', properties: { selection_mode: 'rectangle' }, geometry: { type: 'Polygon', coordinates: [[[west,south],[east,south],[east,north],[west,north],[west,south]]] } };
+    }
+    function updateSelection(feature) {
+      selectionFeature = feature;
+      selectionMap.getSource('selection').setData(feature || { type: 'FeatureCollection', features: [] });
+      const n = feature ? feature.geometry.coordinates[0].length - 1 : 0;
+      showSelectionStatus(feature ? `${feature.properties.selection_mode} selected · ${n} corners · ready for analysis` : 'No region selected.');
+    }
+    function finishPolygon() {
+      if (selectionPoints.length < 3) return;
+      updateSelection({ type: 'Feature', properties: { selection_mode: 'polygon' }, geometry: { type: 'Polygon', coordinates: [[...selectionPoints, selectionPoints[0]]] } });
+      selectionMode = null; selectionPoints = [];
+    }
+    function initSelectionMap() {
+      if (selectionMap) { selectionMap.resize(); return; }
+      selectionMap = new maplibregl.Map({ container: 'selectionMap', center: [73.0697, 19.0468], zoom: 15.4, pitch: 0, style: 'https://tiles.openfreemap.org/styles/bright' });
+      selectionMap.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+      selectionMap.on('load', () => {
+        selectionMap.addSource('selection', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        selectionMap.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': '#38bdf8', 'fill-opacity': 0.2 } });
+        selectionMap.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': '#0284c7', 'line-width': 3 } });
+        selectionMap.on('click', event => {
+          if (!selectionMode) return;
+          const point = [event.lngLat.lng, event.lngLat.lat];
+          if (selectionMode === 'rectangle' && selectionPoints.length === 1) { updateSelection(rectangleFeature(selectionPoints[0], point)); selectionPoints = []; selectionMode = null; return; }
+          selectionPoints.push(point); showSelectionStatus(`${selectionMode}: ${selectionPoints.length} corner${selectionPoints.length === 1 ? '' : 's'} added · double-click to finish`);
+        });
+        selectionMap.doubleClickZoom.disable();
+        selectionMap.on('dblclick', finishPolygon);
+      });
+    }
+    document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); map.resize(); });
+    document.getElementById('selectionTab').addEventListener('click', () => { document.getElementById('selectionTab').classList.add('active'); document.getElementById('threeDTab').classList.remove('active'); document.getElementById('threeDControls').hidden = true; document.getElementById('selectionControls').hidden = false; document.getElementById('map').classList.remove('active'); document.getElementById('selectionMap').classList.add('active'); initSelectionMap(); });
+    document.getElementById('rectangleTool').addEventListener('click', () => { selectionMode = 'rectangle'; selectionPoints = []; showSelectionStatus('Rectangle: click the first corner, then the opposite corner.'); });
+    document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; showSelectionStatus('Polygon: click corners, then double-click to finish.'); });
+    document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateSelection(null); });
+    const pitch = document.getElementById('pitch');
+    const pitchValue = document.getElementById('pitchValue');
+    pitch.addEventListener('input', () => { pitchValue.value = `${pitch.value}°`; map.setPitch(Number(pitch.value)); });
+    const terrainExaggeration = document.getElementById('terrainExaggeration');
+    const terrainValue = document.getElementById('terrainValue');
+    terrainExaggeration.addEventListener('input', () => {
+      const factor = Number(terrainExaggeration.value);
+      terrainValue.value = `${factor.toFixed(2)}×`;
+      if (map.getSource('terrain')) map.setTerrain({ source: 'terrain', exaggeration: factor });
+    });
+  </script>
+</body>
+</html>

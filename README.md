@@ -2,6 +2,8 @@
 
 Helios is a regional solar-site discovery and scouting platform. It converts a selected area of interest into an explainable, uncertainty-aware shortlist of rooftop candidates worth inspecting first.
 
+The application is being built as an incremental, visible product: the map and a small working analysis come first; new datasets and scoring factors are added one at a time through stable contracts. This keeps every change demonstrable in the browser and prevents a half-integrated collection of models from becoming the product.
+
 The hackathon MVP is deliberately narrow: evaluate 1,000-5,000 buildings in one compact region, calculate comparable technical and early-economic features, rank the candidates, and visualize the results in GeoLibre.
 
 ## What Helios does
@@ -36,6 +38,66 @@ This baseline establishes the shared contracts and collaboration surface for Tea
 - GitHub Actions CI;
 - issue and pull-request templates;
 - six-person atomic ownership and three-day integration plan.
+
+The current product direction is the **AOI analysis workspace**. A user draws a rectangle or free-form polygon on the map, chooses the factors to run, and receives only the buildings and scores that fall inside that shape. The first slice uses the Kharghar viewer and real public building/terrain inputs; later slices add solar, grid and economic factors without changing the drawing workflow.
+
+## Run the visible application
+
+The quickest local preview is the checked-in GeoLibre/MapLibre viewer:
+
+```powershell
+cd apps/geolibre/experimental/kharghar-3d
+python -m http.server 8765
+```
+
+Open <http://localhost:8765/>. This is a visual sandbox, not yet the official ranking API. It is the first shared surface for checking map behaviour, data provenance and 3D presentation.
+
+The intended hosted preview is the Vercel deployment of this repository. Vercel serves the same viewer at `/`, so a commit on the shared integration branch becomes the team’s visible source of truth. The deployment is deliberately static at this stage; the FastAPI service remains a separate local/container service until the analysis endpoint is ready for hosting.
+
+## Product workflow (current target)
+
+```text
+draw rectangle or polygon
+  -> validate AOI (closed, valid, supported size/CRS)
+  -> load registered datasets for that AOI
+  -> discover building candidates
+  -> run enabled factor plug-ins
+  -> apply hard exclusions
+  -> rank with confidence and missing-data warnings
+  -> show coloured candidates, table, explanations and provenance
+```
+
+An analysis run is reproducible: it records the AOI GeoJSON, enabled factor IDs, dataset versions, assumptions and timestamp. Adding a factor must not silently change an earlier run.
+
+### Factor plug-in contract
+
+Each factor is an independent calculator. It receives a candidate and the selected AOI context and returns a value, unit, confidence, source/version and warnings. The ranking layer combines these standardized results; it does not know how a height raster, irradiance series or rent CSV was produced. Missing data is reported as missing, never quietly replaced with zero.
+
+Initial factor order:
+
+1. footprint and candidate discovery;
+2. building height, roof area and terrain;
+3. solar resource and usable roof estimate;
+4. grid/access proximity proxies;
+5. early economics and scenario ranking;
+6. uncertainty, stability and human validation.
+
+## New team allocation for the main application
+
+Ownership is now by module, not by a list of loosely connected features. Each person can work independently against the shared contracts and produce a visible result.
+
+| Owner | Single responsibility | Visible result |
+|---|---|---|
+| Person 1 | AOI map shell, drawing tools and source-layer loading | Drawn rectangle/polygon and visible footprints |
+| Person 2 | Spatial factor plug-ins (height, terrain, roof geometry) | Per-building spatial attributes and coloured layer |
+| Person 3 | Solar and early-economic factor plug-ins | Solar/yield/economic fields in the candidate table |
+| Person 4 | Ranking, explanations, confidence and stability | Ordered shortlist, reason codes and uncertainty panel |
+| Person 5 | API, dataset registry and run orchestration | One run contract connecting UI, factors and output GeoJSON |
+| Person 6 | Validation, evidence and demo acceptance | Reproducible demo script, checks, screenshots and claim ledger |
+
+The handoff rule is simple: a person publishes their module through the contract and a small fixture; they do not edit another owner’s module to make an integration pass. Person 5 wires modules together only after the fixture and contract checks pass. Person 6 verifies the result from the browser and records what is actually demonstrated.
+
+See [the incremental execution plan](docs/INCREMENTAL_APPLICATION_PLAN.md) for the step-by-step build order and handoff criteria.
 
 ## Quick start
 

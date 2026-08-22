@@ -57,3 +57,5 @@ models/weights/
 # Database
 *.sql.gz
 postgres-data/
+
+.vercel
