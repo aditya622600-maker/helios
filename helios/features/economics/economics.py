@@ -57,7 +57,13 @@ def calculate_economic_feature(
     payback = (
         cost / value if cost is not None and value is not None and value > 0 else None
     )
-    confidence = 1.0 if cost is not None and value is not None else 0.5 if value is not None else 0.0
+    confidence = (
+        1.0
+        if cost is not None and value is not None
+        else 0.5
+        if value is not None
+        else 0.0
+    )
     return EconomicFeature(
         estimated_cost_inr=cost,
         estimated_rent_inr_month=economics.rent_inr_month,
