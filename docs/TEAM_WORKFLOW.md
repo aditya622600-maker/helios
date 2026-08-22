@@ -15,6 +15,10 @@ This page is the short operating agreement. The complete person-by-person proced
 
 No person may silently take over another person's transformation. If an upstream output is unavailable, use the checked-in fixture with the same schema.
 
+## Source-availability rule
+
+The GOBS dashboard is not a direct raw-data download. GOBS state files are request-only and therefore optional enrichment. Person 1 builds the baseline from Google Open Buildings v3 polygons and Open Buildings Temporal v1 heights; Persons 2–5 must keep the pipeline executable without GOBS; Person 6 identifies each result as fallback-only or enriched. See [the verified finding, actions and six-person differences](data/GOBS_ACCESS_AND_FALLBACK.md).
+
 ## Shared integration rule
 
 1. Person 5 freezes the v1 contracts and sample fixtures before parallel work begins.

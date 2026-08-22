@@ -102,6 +102,25 @@ Do not scale to thousands of candidates until this single-candidate path works.
 
 See the [six-person execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md) for the complete step-by-step procedure, owned paths, handoffs and non-collision rules.
 
+### Person 4 ranking workstream
+
+The isolated Person 4 implementation accepts separate P2, P3 and confidence tables,
+enforces assumption/version alignment, and returns ranked candidates, deterministic
+explanations, a confidence-calibrated stability report and an optional label-based
+evaluation report.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_person4.py `
+  data\fixtures\person4\person4-request.json `
+  --output output\person4\ranking-bundle.json
+```
+
+Read the [Person 4 handoff contract](docs/person4/HANDOFF_CONTRACT.md),
+[research gap and method](docs/person4/RESEARCH_GAP_AND_METHOD.md) and
+[AI working brief](docs/person4/AI_WORKING_BRIEF.md) before changing ranking behavior.
+The [frozen feature dictionary](docs/person4/FEATURE_DICTIONARY.md) defines field
+direction, units, missing policies and named weight presets.
+
 ## Core engineering rules
 
 1. The contracts in `helios/contracts/` are the team boundary.
@@ -114,6 +133,7 @@ See the [six-person execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md) for the c
 8. Excluded candidates never enter a ranking.
 9. Every top candidate must have component scores, confidence and reason codes.
 10. Quantitative presentation claims must trace to recorded validation results.
+11. Request-only sources are optional enrichment; the cached demo must run from a lawful, reproducible public baseline.
 
 ## Documentation map
 
@@ -122,6 +142,7 @@ See the [six-person execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md) for the c
 - [Team workflow](docs/TEAM_WORKFLOW.md)
 - [Six-person step-by-step execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md)
 - [Data and citations](docs/data/DATA_AND_PROVENANCE.md)
+- [GOBS access finding and public fallback](docs/data/GOBS_ACCESS_AND_FALLBACK.md)
 - [Temporal alignment](docs/data/TEMPORAL_ALIGNMENT.md)
 - [Ranking and validation](docs/evaluation/RANKING_VALIDATION.md)
 - [GeoLibre contract](apps/geolibre/README.md)

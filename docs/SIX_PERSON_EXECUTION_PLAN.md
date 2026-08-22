@@ -6,6 +6,10 @@ The team has five technically sound contributors and one non-technical contribut
 
 The fixed demonstration AOI is **Kharghar**. Helios remains a scouting-priority system for roughly 1,000–5,000 buildings, not a structural, legal or grid-interconnection approval system.
 
+### Data-access correction — 2026-08-22
+
+GOBS state files are request-only through the official contact route; the dashboard is not a raw-download API. The build therefore uses Google Open Buildings v3 polygons and Open Buildings Temporal v1 heights as its reproducible baseline. GOBS is optional enrichment if a file arrives and its terms permit use. Nobody waits for it. The exact source hierarchy, joins, proposed actions and per-person acceptance tests are in [GOBS access finding and executable fallback](data/GOBS_ACCESS_AND_FALLBACK.md).
+
 ## 2. Frozen handoff artifacts
 
 These files are the interfaces between people. Real outputs may remain outside Git when large, but every branch must include a small fixture with the same schema.
@@ -46,15 +50,15 @@ Create one Kharghar boundary polygon, assign an AOI version such as `kharghar-v1
 
 #### Step 2: register sources before downloading
 
-Create a manifest record for every planned source. Use GOBS/Open Buildings for building polygons and height attributes, OpenStreetMap for roads and mapped power infrastructure, Copernicus GLO-30 for terrain context, and the selected solar/weather and economic proxy sources. Record licenses and temporal coverage before use.
+Create a manifest record for every planned source. Use Google Open Buildings v3 for candidate polygons, Open Buildings Temporal v1 for baseline height, OpenStreetMap for roads and mapped power infrastructure, Copernicus GLO-30 for terrain context, and the selected solar/weather and economic proxy sources. Submit the GOBS Maharashtra state-file request and record its status as optional enrichment. Record licenses and temporal coverage before use.
 
 #### Step 3: acquire building candidates
 
-Clip GOBS/Open Buildings records to `kharghar-v1`. Preserve the source identifier. Create a stable Helios `candidate_id` for every polygon; never use row number as identity.
+Clip Google Open Buildings v3 polygons to `kharghar-v1` and sample Temporal v1 height to them. Preserve source identifiers and source confidence. Create a stable Helios `candidate_id` for every polygon; never use row number as identity. If a GOBS file arrives, audit a small spatial match before enriching the batch; never join by row order.
 
 #### Step 4: validate building data
 
-Repair invalid polygons, remove exact duplicates, flag implausible areas/heights and quantify missingness. Do not invent missing height values. Preserve raw values and source confidence.
+Repair invalid polygons, remove exact duplicates, flag implausible areas/heights and quantify missingness. Do not invent missing height values. Preserve raw values, source availability, sampling/join method, match distance and source confidence. Keep requested bulk GOBS data outside Git unless redistribution is explicitly permitted.
 
 #### Step 5: acquire contextual layers
 
@@ -111,7 +115,7 @@ Calculate polygon area, perimeter, compactness and any simple orientation measur
 
 #### Step 3: fuse height evidence
 
-Implement the documented weighted height fusion for available GOBS/Open Buildings height observations. Output the fused value, contributing sources, disagreement range and height confidence. Missing evidence remains null with low confidence.
+Implement documented height handling for one source, multiple sources or no height. Temporal v1 is the baseline observation; an audited GOBS match may be added as optional evidence. Output the fused value, contributing sources, disagreement range and height confidence. Missing evidence remains null with low confidence.
 
 #### Step 4: add terrain context
 
@@ -171,6 +175,8 @@ Document module efficiency, performance ratio, usable-area factor, system losses
 #### Step 2: load only registered inputs
 
 Consume Person 1's cited irradiance/weather/economic inputs and Person 2's area, height and shading-proxy fields. Reject unregistered manual numbers.
+
+Do not require GOBS floor or land-use attributes. When they are absent, preserve nulls and propagate the reduced confidence or sensitivity rather than changing the model formula silently.
 
 #### Step 3: determine usable PV capacity
 
@@ -248,7 +254,7 @@ Select the strongest positive factors and meaningful cautions from component val
 
 #### Step 6: measure rank stability
 
-Perturb uncertain inputs and allowed weight ranges, then calculate top-K overlap and rank intervals. Mark unstable candidates instead of hiding variation.
+Perturb uncertain inputs and allowed weight ranges, then calculate top-K overlap and rank intervals. Add a source-availability scenario that masks all GOBS-derived fields and compare it with any enriched run. Mark unstable candidates instead of hiding variation, and never reward candidates simply for having more observed fields.
 
 #### Step 7: evaluate baselines
 
@@ -298,7 +304,7 @@ Publish example request, source manifest, feature and result objects before para
 
 #### Step 2: build fixture-first adapters
 
-Create loader interfaces for P1, P2, P3 and P4 outputs using sample files. Each loader validates IDs, units, required columns and provenance; it never silently renames fields.
+Create loader interfaces for P1, P2, P3 and P4 outputs using sample files. Each loader validates IDs, units, required columns and provenance; it never silently renames fields. Keep the public Open Buildings baseline mandatory and the GOBS loader optional. Absence of GOBS emits a source-capability warning rather than failing the run.
 
 #### Step 3: design PostGIS persistence
 
@@ -375,7 +381,7 @@ After labels and baseline are locked, inspect the Helios top-K in GeoLibre. Reco
 
 #### Step 6: maintain the evidence ledger
 
-For every number intended for slides, record the source run ID, metric, sample size and file or link. If evidence is absent, change “improves” to “designed to improve.”
+For every number intended for slides, record the source run ID, metric, sample size and file or link. Mark each run `fallback-only` or `GOBS-enriched`, and record the GOBS request status separately. If evidence is absent, change “improves” to “designed to improve.” Never describe the request-only GOBS state file as a direct public download.
 
 #### Step 7: write the demo script
 
@@ -418,7 +424,7 @@ Codex will not resolve a scientific disagreement by averaging two implementation
 
 ### Day 1, Hour 0–2: contract freeze
 
-P5 publishes schemas and fixtures. P1 starts real data. P2–P4 build against fixtures. P6 prepares the rubric and baseline sheet.
+P5 publishes schemas and fixtures. P1 submits the GOBS request and starts the Open Buildings v3 plus Temporal v1 public fallback immediately. P2–P4 build against fixtures without waiting for GOBS. P6 prepares the rubric, baseline sheet and source-access claim wording.
 
 ### Day 1, Hour 6: first artifact review
 
@@ -430,7 +436,7 @@ The same `candidate_id` must exist in P1 data, P2 features, P3 features, P4 resu
 
 ### Day 2, Hour 8: batch and validation gate
 
-Run the frozen Kharghar batch, collect top-K labels and compare at least the manual and solar-only baselines.
+Run the frozen Kharghar batch, collect top-K labels and compare at least the manual and solar-only baselines. If GOBS enrichment is available, also record fallback-only versus enriched top-K overlap; otherwise report the fallback-only run without delay.
 
 ### Day 2 end: feature-freeze candidate
 
