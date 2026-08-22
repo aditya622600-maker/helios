@@ -1,4 +1,0 @@
-pandas
-pvlib
-requests
-numpy
