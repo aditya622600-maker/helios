@@ -30,9 +30,9 @@ def test_three_step_solar_hand_calculation() -> None:
         assumptions=ASSUMPTIONS,
     )
 
-    # 100 * 0.70 / 5 = 14 kWp; 14 * 1800 * 0.8 * 0.86 * 0.96 = 16654.848 kWh
+    # 100 * 0.70 / 5 = 14 kWp; 14 * 1800 * 0.8 * 0.86 * 0.96 = 16644.096 kWh
     assert feature.installable_capacity_kwp == 14.0
-    assert feature.annual_yield_kwh == pytest.approx(16654.848)
+    assert feature.annual_yield_kwh == pytest.approx(16644.096)
     assert feature.loss_shading_fraction == pytest.approx(0.20)
     assert feature.solar_confidence == 0.8
 
@@ -53,7 +53,7 @@ def test_less_shading_cannot_increase_yield() -> None:
 def test_missing_commercial_data_is_not_zero_filled() -> None:
     economic = calculate_economic_feature(
         installable_capacity_kwp=14,
-        annual_yield_kwh=16654.848,
+        annual_yield_kwh=16644.096,
         economics=EconomicsInput(
             capex_inr_per_kwp=None,
             energy_value_inr_per_kwh=None,
@@ -71,7 +71,7 @@ def test_missing_commercial_data_is_not_zero_filled() -> None:
 def test_registered_economic_values_calculate_payback() -> None:
     economic = calculate_economic_feature(
         installable_capacity_kwp=14,
-        annual_yield_kwh=16654.848,
+        annual_yield_kwh=16644.096,
         economics=EconomicsInput(
             capex_inr_per_kwp=50_000,
             energy_value_inr_per_kwh=8,
@@ -82,5 +82,5 @@ def test_registered_economic_values_calculate_payback() -> None:
         ),
     )
     assert economic.estimated_cost_inr == 700_000
-    assert economic.annual_energy_value_inr == pytest.approx(133238.784)
-    assert economic.simple_payback_years == pytest.approx(5.2537)
+    assert economic.annual_energy_value_inr == pytest.approx(133152.768)
+    assert economic.simple_payback_years == pytest.approx(5.2571)
