@@ -17,6 +17,8 @@
     p { margin: 4px 0 12px; color: #94a3b8; font-size: 12px; line-height: 1.4; }
     label { display: block; margin-top: 10px; font-size: 12px; color: #cbd5e1; }
     input { width: 100%; accent-color: #38bdf8; }
+    select { width: 100%; margin: 8px 0; padding: 7px; border: 1px solid #475569; border-radius: 6px; background: #0f172a; color: #e2e8f0; font: inherit; font-size: 12px; }
+    #runAnalysis { width: 100%; margin-top: 2px; }
     .legend { margin-top: 10px; font-size: 11px; color: #94a3b8; }
     .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
     button { border: 1px solid #475569; border-radius: 6px; padding: 7px 9px; background: #1e293b; color: #e2e8f0; cursor: pointer; font: inherit; font-size: 12px; }
@@ -45,6 +47,12 @@
       <div class="tools"><button id="rectangleTool">Rectangle</button><button id="polygonTool">Polygon</button><button id="clearSelection">Clear</button></div>
       <div class="legend">Rectangle: click two opposite corners. Polygon: click each corner, then double-click to finish.</div>
       <div id="selectionStatus" class="status">No region selected.</div>
+      <div id="analysisPanel" class="status" hidden>
+        <label for="factorSelect">Colour selected buildings by</label>
+        <select id="factorSelect"><option value="height">Building height</option><option value="usable_area">Usable rooftop area</option><option value="irradiance">Irradiance proxy</option><option value="yield">Annual yield proxy</option></select>
+        <button id="runAnalysis">Run selected-region analysis</button>
+        <div id="rankingList" class="legend">Choose a factor and run analysis.</div>
+      </div>
     </section>
   </aside>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
@@ -117,7 +125,15 @@
     let selectionPoints = [];
     let selectionFeature;
     let all3DBuildings = null;
+    let selectedAnalysis = null;
     const USABLE_ROOF_FRACTION = 0.70;
+    // Add a factor here when a new model/data product becomes available.
+    const ANALYSIS_FACTORS = {
+      height: { label: 'Building height', unit: 'm', value: f => Number(f.properties.height_m) || 0 },
+      usable_area: { label: 'Usable rooftop area', unit: 'm²', value: f => toUsableRoof(f).properties.usable_roof_area_m2 },
+      irradiance: { label: 'Irradiance', unit: 'kWh/m²/year', value: f => 1450 - ((Number(f.properties.height_m) || 6) * 1.5), note: 'Current sample is a transparent proxy; connect the irradiance model output here.' },
+      yield: { label: 'Annual solar yield', unit: 'kWh/year', value: f => toUsableRoof(f).properties.usable_roof_area_m2 * 0.18 * 1400, note: 'Current sample is a transparent proxy; connect the yield model output here.' }
+    };
     const selectionStatus = document.getElementById('selectionStatus');
     function showSelectionStatus(text) { selectionStatus.textContent = text; }
     function rectangleFeature(a, b) {
@@ -141,10 +157,15 @@
       }
       if (all3DBuildings && map.getSource('local-buildings-3d')) {
         const visible = feature ? all3DBuildings.features.filter(f => featureContainsFeature(feature, f)) : all3DBuildings.features;
+        selectedAnalysis = feature ? { features: visible } : null;
+        const panel = document.getElementById('analysisPanel');
+        if (panel) panel.hidden = !feature;
         map.getSource('local-buildings-3d').setData({ type: 'FeatureCollection', features: visible });
         if (map.getSource('usable-roofs-3d')) map.getSource('usable-roofs-3d').setData({ type: 'FeatureCollection', features: visible.map(toUsableRoof) });
         map.setLayoutProperty('local-buildings-3d', 'visibility', feature ? 'visible' : 'none');
         if (map.getLayer('usable-roofs-3d')) map.setLayoutProperty('usable-roofs-3d', 'visibility', feature ? 'visible' : 'none');
+        if (map.getLayer('local-buildings-3d')) map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', '#60a5fa');
+        document.getElementById('rankingList').textContent = feature ? `${visible.length} buildings in the selected region. Choose a factor and run analysis.` : 'Choose a factor and run analysis.';
       }
       if (map.getSource('aoi-3d')) map.getSource('aoi-3d').setData(feature || { type: 'FeatureCollection', features: [] });
     }
@@ -160,6 +181,25 @@
       const inset = ring.map(p => [center[0] + (p[0] - center[0]) * 0.82, center[1] + (p[1] - center[1]) * 0.82]);
       const roof = Math.round(footprintAreaM2(ring));
       return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [inset] }, properties: { ...feature.properties, roof_area_m2: roof, usable_roof_area_m2: Math.round(roof * USABLE_ROOF_FRACTION), roof_height_m: Number(feature.properties.height_m) || 6 } };
+    }
+    function runAnalysis() {
+      if (!selectedAnalysis || !selectedAnalysis.features.length) {
+        document.getElementById('rankingList').textContent = 'No buildings are fully inside the selected region.';
+        return;
+      }
+      const key = document.getElementById('factorSelect').value;
+      const factor = ANALYSIS_FACTORS[key];
+      const rows = selectedAnalysis.features.map(feature => ({ feature, value: Number(factor.value(feature)) || 0 }));
+      const values = rows.map(row => row.value);
+      const min = Math.min(...values), max = Math.max(...values);
+      rows.forEach(row => { row.score = max === min ? 1 : (row.value - min) / (max - min); });
+      rows.sort((a, b) => b.score - a.score);
+      const scored = { type: 'FeatureCollection', features: rows.map(row => ({ ...row.feature, properties: { ...row.feature.properties, analysis_score: row.score, analysis_value: row.value } })) };
+      map.getSource('local-buildings-3d').setData(scored);
+      map.getSource('usable-roofs-3d').setData({ type: 'FeatureCollection', features: scored.features.map(toUsableRoof) });
+      map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', ['interpolate', ['linear'], ['get', 'analysis_score'], 0, '#fecaca', 0.5, '#f97316', 1, '#991b1b']);
+      const ranking = rows.slice(0, 10).map((row, index) => `<div>${index + 1}. ${row.feature.properties.osm_way_id || 'building'} · ${row.value.toFixed(1)} ${factor.unit} · ${Math.round(row.score * 100)}%</div>`).join('');
+      document.getElementById('rankingList').innerHTML = `<strong>${factor.label}</strong>${factor.note ? `<br><small>${factor.note}</small>` : ''}<br>${ranking || 'No candidates.'}`;
     }
     function pointInRing(point, ring) {
       for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -247,6 +287,8 @@
     document.getElementById('rectangleTool').addEventListener('click', () => { selectionMode = 'rectangle'; selectionPoints = []; updateDraft([]); showSelectionStatus('Rectangle: click the first corner, then the opposite corner.'); });
     document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then double-click to finish.'); });
     document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateDraft([]); updateSelection(null); });
+    document.getElementById('runAnalysis').addEventListener('click', runAnalysis);
+    document.getElementById('factorSelect').addEventListener('change', runAnalysis);
     const pitch = document.getElementById('pitch');
     const pitchValue = document.getElementById('pitchValue');
     pitch.addEventListener('input', () => { pitchValue.value = `${pitch.value}°`; map.setPitch(Number(pitch.value)); });
