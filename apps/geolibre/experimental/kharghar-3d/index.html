@@ -153,8 +153,8 @@
     const ANALYSIS_FACTORS = {
       height: { label: 'Building height', unit: 'm', value: f => Number(f.properties.height_m) || 0 },
       usable_area: { label: 'Usable rooftop area', unit: 'm²', value: f => toUsableRoof(f).properties.usable_roof_area_m2 },
-      irradiance: { label: 'Irradiance', unit: 'kWh/m²/year', value: f => 1450 - ((Number(f.properties.height_m) || 6) * 1.5), note: 'Current sample is a transparent proxy; connect the irradiance model output here.' },
-      yield: { label: 'Annual solar yield', unit: 'kWh/year', value: f => toUsableRoof(f).properties.usable_roof_area_m2 * 0.18 * 1400, note: 'Current sample is a transparent proxy; connect the yield model output here.' }
+      irradiance: { label: 'Irradiance', unit: 'kWh/m²/year', value: f => 1450 - ((Number(f.properties.height_m) || 6) * 1.5), note: 'Current sample is a transparent proxy; connect the irradiance model output here.', parameters: 'Solar irradiance baseline, roof height as a simple obstruction proxy; the production model should add weather, temperature, humidity, wind, rain, pressure, orientation, slope, and shading.', sources: [['Weather-parameter PV output ML paper', 'https://www.researchgate.net/publication/358007776_Estimation_of_Solar_Panel_Output_based_on_Weather_Parameters_using_Machine_Learning_Algorithms'], ['PV forecasting research topic', 'https://www.frontiersin.org/research-topics/45695/solar-radiation-and-photovoltaic-system-forecasting/magazine'], ['PV output and irradiance measurement guidance', 'https://www.anernstore.com/blogs/diy-solar-guides/measure-panel-output-irradiance']] },
+      yield: { label: 'Annual solar yield', unit: 'kWh/year', value: f => toUsableRoof(f).properties.usable_roof_area_m2 * 0.18 * 1400, note: 'Current sample is a transparent proxy; connect the yield model output here.', parameters: 'Usable rooftop area × assumed module efficiency × annual irradiance; replace with the PV calculator/ML output for final scoring.', sources: [['Weather-parameter PV output ML paper', 'https://www.researchgate.net/publication/358007776_Estimation_of_Solar_Panel_Output_based_on_Weather_Parameters_using_Machine_Learning_Algorithms'], ['PV forecasting research topic', 'https://www.frontiersin.org/research-topics/45695/solar-radiation-and-photovoltaic-system-forecasting/magazine'], ['PV output study (ScienceDirect)', 'https://www.sciencedirect.com/science/article/pii/S1877050917319725']] }
     };
     const selectionStatus = document.getElementById('selectionStatus');
     function showSelectionStatus(text) { selectionStatus.textContent = text; }
@@ -224,7 +224,8 @@
       map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', scoreGradient);
       map.setPaintProperty('usable-roofs-3d', 'fill-extrusion-color', scoreGradient);
       const ranking = rows.slice(0, 10).map((row, index) => `<button class="ranking-row" data-ranking-index="${index}">${index + 1}. ${row.feature.properties.osm_way_id || 'building'} · ${row.value.toFixed(1)} ${factor.unit} · ${Math.round(row.score * 100)}%</button>`).join('');
-      document.getElementById('rankingList').innerHTML = `<strong>${factor.label}</strong>${factor.note ? `<br><small>${factor.note}</small>` : ''}<br>${ranking || 'No candidates.'}`;
+      const citations = (factor.sources || []).map(source => `<a href="${source[1]}" target="_blank" rel="noreferrer">${source[0]}</a>`).join('<br>');
+      document.getElementById('rankingList').innerHTML = `<strong>${factor.label}</strong>${factor.parameters ? `<br><small><b>Parameters:</b> ${factor.parameters}</small>` : ''}${factor.note ? `<br><small>${factor.note}</small>` : ''}${citations ? `<br><small><b>Evidence:</b><br>${citations}</small>` : ''}<br>${ranking || 'No candidates.'}`;
       document.querySelectorAll('.ranking-row').forEach(button => button.addEventListener('click', () => focusRankingBuilding(rows[Number(button.dataset.rankingIndex)]?.feature, button)));
     }
     function focusRankingBuilding(feature, button) {
