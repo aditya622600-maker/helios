@@ -1,0 +1,4 @@
+candidate_id,latitude,longitude,usable_area_m2,building_height_m,shading_factor
+KHAR_001,19.0330,73.0620,500,25,0.85
+KHAR_002,19.4830,73.0620,320,18,0.90
+KHAR_003,18.5830,73.0620,750,30,0.80
