@@ -58,14 +58,21 @@
       <div id="selectionStatus" class="status">No region selected.</div>
     </section>
   </aside>
-  <aside id="analysisPanel" class="analysis-panel" aria-label="Building ranking analysis">
-    <div class="panel-heading"><h2>Building rankings</h2><button id="hideAnalysis" aria-label="Hide analysis panel">Hide</button></div>
+  <aside id="analysisPanel" class="analysis-panel" aria-label="Candidate analysis">
+    <div class="panel-heading"><h2>Candidate analysis</h2><button id="hideAnalysis" aria-label="Hide analysis panel">Hide</button></div>
     <p>Choose a factor to compare buildings in the selected region. Footprints and tagged heights come from the bundled OSM-derived GeoJSON. Irradiance and yield are currently labeled proxies, not measured database values.</p>
     <label for="factorSelect">Rank buildings by</label>
     <select id="factorSelect"><option value="height">Building height</option><option value="usable_area">Usable rooftop area</option><option value="irradiance">Irradiance</option><option value="yield">Annual solar yield</option></select>
     <button id="runAnalysis">Run selected-region analysis</button>
     <div class="legend">Click a result below to locate that building in 3D.</div>
     <div id="rankingList" class="legend">Select a region to enable rankings.</div>
+    <div class="status" id="validationSummary">
+      <strong>Feasibility &amp; validation</strong>
+      <div class="legend">Sample-fixture evidence from the validation protocol:</div>
+      <div class="legend">• 4 min manual baseline vs 28 min<br>• Precision@2: +0.50<br>• nDCG gain: +0.5000</div>
+      <div class="legend">These are hackathon measurements on the Kharghar fixture, not a guarantee for every region.</div>
+      <a href="https://github.com/richennacht/helios/tree/integration/docs/demo" target="_blank" rel="noreferrer" style="color:#7dd3fc;font-size:11px">Open evidence and demo protocol</a>
+    </div>
   </aside>
   <button id="showAnalysis" class="analysis-panel-toggle" aria-label="Show analysis panel" hidden>Show rankings</button>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
