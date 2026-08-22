@@ -108,7 +108,7 @@
           }
         }, firstSymbol && firstSymbol.id);
         map.addSource('usable-roofs-3d', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        map.addLayer({ id: 'usable-roofs-3d', source: 'usable-roofs-3d', type: 'fill-extrusion', paint: { 'fill-extrusion-color': '#0ea5e9', 'fill-extrusion-height': ['+', ['get', 'roof_height_m'], 0.22], 'fill-extrusion-base': ['get', 'roof_height_m'], 'fill-extrusion-opacity': 0.95 } }, firstSymbol && firstSymbol.id);
+        map.addLayer({ id: 'usable-roofs-3d', source: 'usable-roofs-3d', type: 'fill-extrusion', paint: { 'fill-extrusion-color': ['case', ['has', 'analysis_score'], ['interpolate', ['linear'], ['get', 'analysis_score'], 0, '#fecaca', 0.25, '#fdba74', 0.5, '#f97316', 0.75, '#dc2626', 1, '#7f1d1d'], '#0ea5e9'], 'fill-extrusion-height': ['+', ['get', 'roof_height_m'], 0.42], 'fill-extrusion-base': ['+', ['get', 'roof_height_m'], 0.10], 'fill-extrusion-opacity': 0.98 } }, firstSymbol && firstSymbol.id);
         fetch('./data/osm_buildings_3d.geojson').then(response => response.json()).then(data => { all3DBuildings = data; apply3DSelection(selectionFeature); }).catch(() => {});
         map.setLayoutProperty('osm-buildings', 'visibility', 'visible');
         map.addSource('person1', { type: 'geojson', data: './data/candidate_buildings.geojson' });
@@ -175,6 +175,7 @@
         map.setLayoutProperty('local-buildings-3d', 'visibility', feature ? 'visible' : 'none');
         if (map.getLayer('usable-roofs-3d')) map.setLayoutProperty('usable-roofs-3d', 'visibility', feature ? 'visible' : 'none');
         if (map.getLayer('local-buildings-3d')) map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', '#60a5fa');
+        if (map.getLayer('usable-roofs-3d')) map.setPaintProperty('usable-roofs-3d', 'fill-extrusion-color', '#0ea5e9');
         document.getElementById('rankingList').textContent = feature ? `${visible.length} buildings in the selected region. Choose a factor and run analysis.` : 'Choose a factor and run analysis.';
       }
       if (map.getSource('aoi-3d')) map.getSource('aoi-3d').setData(feature || { type: 'FeatureCollection', features: [] });
@@ -200,14 +201,15 @@
       const key = document.getElementById('factorSelect').value;
       const factor = ANALYSIS_FACTORS[key];
       const rows = selectedAnalysis.features.map(feature => ({ feature, value: Number(factor.value(feature)) || 0 }));
-      const values = rows.map(row => row.value);
-      const min = Math.min(...values), max = Math.max(...values);
-      rows.forEach(row => { row.score = max === min ? 1 : (row.value - min) / (max - min); });
-      rows.sort((a, b) => b.score - a.score);
+      rows.sort((a, b) => b.value - a.value);
+      // Percentile/rank scores use the whole colour range even when values are skewed.
+      rows.forEach((row, index) => { row.score = rows.length === 1 ? 1 : 1 - (index / (rows.length - 1)); });
       const scored = { type: 'FeatureCollection', features: rows.map(row => ({ ...row.feature, properties: { ...row.feature.properties, analysis_score: row.score, analysis_value: row.value } })) };
       map.getSource('local-buildings-3d').setData(scored);
       map.getSource('usable-roofs-3d').setData({ type: 'FeatureCollection', features: scored.features.map(toUsableRoof) });
-      map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', ['interpolate', ['linear'], ['get', 'analysis_score'], 0, '#fecaca', 0.5, '#f97316', 1, '#991b1b']);
+      const scoreGradient = ['interpolate', ['linear'], ['get', 'analysis_score'], 0, '#fecaca', 0.25, '#fdba74', 0.5, '#f97316', 0.75, '#dc2626', 1, '#7f1d1d'];
+      map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', scoreGradient);
+      map.setPaintProperty('usable-roofs-3d', 'fill-extrusion-color', scoreGradient);
       const ranking = rows.slice(0, 10).map((row, index) => `<div>${index + 1}. ${row.feature.properties.osm_way_id || 'building'} · ${row.value.toFixed(1)} ${factor.unit} · ${Math.round(row.score * 100)}%</div>`).join('');
       document.getElementById('rankingList').innerHTML = `<strong>${factor.label}</strong>${factor.note ? `<br><small>${factor.note}</small>` : ''}<br>${ranking || 'No candidates.'}`;
     }
