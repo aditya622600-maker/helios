@@ -38,6 +38,7 @@ data/cache/
 data/processed/
 *.tif
 *.tiff
+!data/sample/source_layers/kharghar_terrain.tif
 *.gpkg
 *.pmtiles
 *.parquet
