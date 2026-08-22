@@ -145,6 +145,7 @@ direction, units, missing policies and named weight presets.
 - [GOBS access finding and public fallback](docs/data/GOBS_ACCESS_AND_FALLBACK.md)
 - [Temporal alignment](docs/data/TEMPORAL_ALIGNMENT.md)
 - [Ranking and validation](docs/evaluation/RANKING_VALIDATION.md)
+- [Solar-output ML challenger](docs/ml/SOLAR_OUTPUT_MODEL.md)
 - [GeoLibre contract](apps/geolibre/README.md)
 - [API contract](docs/api/API_CONTRACT.md)
 - [Hackathon runbook](docs/HACKATHON_RUNBOOK.md)
