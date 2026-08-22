@@ -13,6 +13,13 @@
     .view { display: none; height: 100%; }
     .view.active { display: block; }
     .panel { position: absolute; z-index: 2; top: 16px; left: 16px; max-width: 290px; padding: 14px 16px; border: 1px solid #334155; border-radius: 10px; background: #101827e8; color: #e2e8f0; box-shadow: 0 12px 30px #0006; }
+    .analysis-panel { position: absolute; z-index: 3; top: 16px; right: 16px; width: 300px; max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px; border: 1px solid #334155; border-radius: 10px; background: #101827ee; color: #e2e8f0; box-shadow: 0 12px 30px #0006; transition: transform .2s ease, opacity .2s ease; }
+    .analysis-panel.collapsed { transform: translateX(calc(100% + 16px)); opacity: 0; pointer-events: none; }
+    .analysis-panel-toggle { position: absolute; z-index: 4; top: 16px; right: 16px; }
+    .analysis-panel.collapsed + .analysis-panel-toggle { right: 16px; }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .panel-heading h2 { margin: 0; font-size: 15px; }
+    .panel-heading button { padding: 4px 7px; }
     h1 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
     p { margin: 4px 0 12px; color: #94a3b8; font-size: 12px; line-height: 1.4; }
     label { display: block; margin-top: 10px; font-size: 12px; color: #cbd5e1; }
@@ -47,14 +54,17 @@
       <div class="tools"><button id="rectangleTool">Rectangle</button><button id="polygonTool">Polygon</button><button id="clearSelection">Clear</button></div>
       <div class="legend">Rectangle: click two opposite corners. Polygon: click each corner, then double-click to finish.</div>
       <div id="selectionStatus" class="status">No region selected.</div>
-      <div id="analysisPanel" class="status" hidden>
-        <label for="factorSelect">Colour selected buildings by</label>
-        <select id="factorSelect"><option value="height">Building height</option><option value="usable_area">Usable rooftop area</option><option value="irradiance">Irradiance proxy</option><option value="yield">Annual yield proxy</option></select>
-        <button id="runAnalysis">Run selected-region analysis</button>
-        <div id="rankingList" class="legend">Choose a factor and run analysis.</div>
-      </div>
     </section>
   </aside>
+  <aside id="analysisPanel" class="analysis-panel" aria-label="Building ranking analysis">
+    <div class="panel-heading"><h2>Building rankings</h2><button id="hideAnalysis" aria-label="Hide analysis panel">Hide</button></div>
+    <p>Choose a factor to compare buildings in the selected region.</p>
+    <label for="factorSelect">Rank buildings by</label>
+    <select id="factorSelect"><option value="height">Building height</option><option value="usable_area">Usable rooftop area</option><option value="irradiance">Irradiance</option><option value="yield">Annual solar yield</option></select>
+    <button id="runAnalysis">Run selected-region analysis</button>
+    <div id="rankingList" class="legend">Select a region to enable rankings.</div>
+  </aside>
+  <button id="showAnalysis" class="analysis-panel-toggle" aria-label="Show analysis panel" hidden>Show rankings</button>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -158,8 +168,8 @@
       if (all3DBuildings && map.getSource('local-buildings-3d')) {
         const visible = feature ? all3DBuildings.features.filter(f => featureContainsFeature(feature, f)) : all3DBuildings.features;
         selectedAnalysis = feature ? { features: visible } : null;
-        const panel = document.getElementById('analysisPanel');
-        if (panel) panel.hidden = !feature;
+        const runButton = document.getElementById('runAnalysis');
+        if (runButton) runButton.disabled = !feature;
         map.getSource('local-buildings-3d').setData({ type: 'FeatureCollection', features: visible });
         if (map.getSource('usable-roofs-3d')) map.getSource('usable-roofs-3d').setData({ type: 'FeatureCollection', features: visible.map(toUsableRoof) });
         map.setLayoutProperty('local-buildings-3d', 'visibility', feature ? 'visible' : 'none');
@@ -289,6 +299,11 @@
     document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateDraft([]); updateSelection(null); });
     document.getElementById('runAnalysis').addEventListener('click', runAnalysis);
     document.getElementById('factorSelect').addEventListener('change', runAnalysis);
+    const analysisPanel = document.getElementById('analysisPanel');
+    const hideAnalysis = document.getElementById('hideAnalysis');
+    const showAnalysis = document.getElementById('showAnalysis');
+    hideAnalysis.addEventListener('click', () => { analysisPanel.classList.add('collapsed'); showAnalysis.hidden = false; });
+    showAnalysis.addEventListener('click', () => { analysisPanel.classList.remove('collapsed'); showAnalysis.hidden = true; });
     const pitch = document.getElementById('pitch');
     const pitchValue = document.getElementById('pitchValue');
     pitch.addEventListener('input', () => { pitchValue.value = `${pitch.value}°`; map.setPitch(Number(pitch.value)); });
