@@ -84,4 +84,4 @@ def test_registered_economic_values_calculate_payback() -> None:
     )
     assert economic.estimated_cost_inr == 700_000
     assert economic.annual_energy_value_inr == pytest.approx(133152.768)
-    assert economic.simple_payback_years == pytest.approx(5.2571)
+    assert economic.simple_payback_years == pytest.approx(5.2571194014)
