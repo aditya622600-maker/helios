@@ -306,7 +306,8 @@
           if (!selectionMode) return;
           const point = [event.lngLat.lng, event.lngLat.lat];
           if (selectionMode === 'rectangle' && selectionPoints.length === 1) { updateSelection(rectangleFeature(selectionPoints[0], point)); selectionPoints = []; selectionMode = null; updateDraft([]); return; }
-          selectionPoints.push(point); updateDraft(selectionPoints); showSelectionStatus(`${selectionMode}: ${selectionPoints.length} corner${selectionPoints.length === 1 ? '' : 's'} added · double-click to finish`);
+          if (selectionMode === 'polygon' && selectionPoints.length >= 3 && sameSelectionPoint(point, selectionPoints[0])) { finishPolygon(); return; }
+      selectionPoints.push(point); updateDraft(selectionPoints); showSelectionStatus(`${selectionMode}: ${selectionPoints.length} corner${selectionPoints.length === 1 ? '' : 's'} added · click the first point again or double-click to finish`);
         });
         selectionMap.on('mousemove', event => {
           if (selectionMode !== 'rectangle' || selectionPoints.length !== 1) return;
@@ -328,10 +329,14 @@
         selectionMap.on('dblclick', finishPolygon);
       });
     }
+    function sameSelectionPoint(a, b) {
+      // A small geographic tolerance makes the first visible vertex easy to click.
+      return Math.abs(a[0] - b[0]) < 0.00018 && Math.abs(a[1] - b[1]) < 0.00018;
+    }
     document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); map.resize(); apply3DSelection(selectionFeature); });
     document.getElementById('selectionTab').addEventListener('click', () => { document.getElementById('selectionTab').classList.add('active'); document.getElementById('threeDTab').classList.remove('active'); document.getElementById('threeDControls').hidden = true; document.getElementById('selectionControls').hidden = false; document.getElementById('map').classList.remove('active'); document.getElementById('selectionMap').classList.add('active'); initSelectionMap(); });
     // Rectangle support remains implemented for a future UI toggle, but is intentionally hidden for now.
-    document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then double-click to finish.'); });
+    document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then click the first point again or double-click to finish.'); });
     document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateDraft([]); updateSelection(null); });
     document.getElementById('runAnalysis').addEventListener('click', runAnalysis);
     document.getElementById('factorSelect').addEventListener('change', runAnalysis);
