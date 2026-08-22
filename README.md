@@ -35,7 +35,7 @@ This baseline establishes the shared contracts and collaboration surface for Tea
 - unit and API tests;
 - GitHub Actions CI;
 - issue and pull-request templates;
-- five-person ownership and three-day integration plan.
+- six-person atomic ownership and three-day integration plan.
 
 ## Quick start
 
@@ -93,13 +93,14 @@ Do not scale to thousands of candidates until this single-candidate path works.
 
 | Workstream | Owner |
 |---|---|
-| ML, ranking and uncertainty | Person 1 / ML lead |
-| GIS data, provenance and GeoLibre setup | Person 2 / GIS lead |
-| Geometry, shading and solar yield | Person 3 / solar lead |
-| FastAPI, PostGIS and integration | Person 4 / platform lead |
-| Product, validation and demonstration | Person 5 / product lead |
+| Kharghar source data and GeoLibre base layers | Person 1 / data-GIS engineer |
+| Spatial roof, height, terrain and proximity features | Person 2 / spatial-feature engineer |
+| Solar yield and early techno-economics | Person 3 / solar-economics engineer |
+| Ranking, explanations, uncertainty and optional ML | Person 4 / ranking-ML engineer |
+| FastAPI, PostGIS, contracts and pipeline integration | Person 5 / platform engineer |
+| Human validation, evidence ledger and demonstration | Person 6 / non-technical validation-demo owner |
 
-See [docs/TEAM_WORKFLOW.md](docs/TEAM_WORKFLOW.md) for exact inputs, outputs and acceptance criteria.
+See the [six-person execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md) for the complete step-by-step procedure, owned paths, handoffs and non-collision rules.
 
 ## Core engineering rules
 
@@ -119,6 +120,7 @@ See [docs/TEAM_WORKFLOW.md](docs/TEAM_WORKFLOW.md) for exact inputs, outputs and
 - [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)
 - [Architecture decisions](docs/architecture/decisions/)
 - [Team workflow](docs/TEAM_WORKFLOW.md)
+- [Six-person step-by-step execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md)
 - [Data and citations](docs/data/DATA_AND_PROVENANCE.md)
 - [Temporal alignment](docs/data/TEMPORAL_ALIGNMENT.md)
 - [Ranking and validation](docs/evaluation/RANKING_VALIDATION.md)
