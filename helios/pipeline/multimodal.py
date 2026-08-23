@@ -35,11 +35,18 @@ def rank_selected_aoi(request: P5RankingRequest, aoi: dict[str, Any]) -> Ranking
 
 
 def _geometry_strictly_inside(geometry: dict[str, Any], aoi: dict[str, Any]) -> bool:
-    if geometry.get("type") != "Polygon" or aoi.get("type") != "Polygon":
+    if aoi.get("type") != "Polygon":
+        return False
+    aoi_ring = aoi.get("coordinates", [[]])[0]
+    if geometry.get("type") == "Point":
+        point = geometry.get("coordinates", [])
+        return _point_strictly_inside(point, aoi_ring)
+    if geometry.get("type") != "Polygon":
         return False
     building_ring = geometry.get("coordinates", [[]])[0]
-    aoi_ring = aoi.get("coordinates", [[]])[0]
-    return bool(building_ring) and all(_point_strictly_inside(point, aoi_ring) for point in building_ring)
+    return bool(building_ring) and all(
+        _point_strictly_inside(point, aoi_ring) for point in building_ring
+    )
 
 
 def _point_strictly_inside(point: list[float], ring: list[list[float]]) -> bool:
@@ -51,7 +58,11 @@ def _point_strictly_inside(point: list[float], ring: list[list[float]]) -> bool:
         x1, y1 = ring[index][:2]
         x2, y2 = ring[index + 1][:2]
         cross = (y - y1) * (x2 - x1) - (x - x1) * (y2 - y1)
-        if abs(cross) < 1e-10 and min(x1, x2) <= x <= max(x1, x2) and min(y1, y2) <= y <= max(y1, y2):
+        if (
+            abs(cross) < 1e-10
+            and min(x1, x2) <= x <= max(x1, x2)
+            and min(y1, y2) <= y <= max(y1, y2)
+        ):
             return False
         if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1:
             inside = not inside

@@ -215,3 +215,19 @@ direction, units, missing policies and named weight presets.
 ## License status
 
 No open-source license has been selected yet. Until the team explicitly chooses one, treat this repository as private team work.
+
+## Backend analysis endpoint
+
+The FastAPI service now owns the default Person 4 analysis request instead of requiring the browser to assemble internal P2/P3/confidence tables. Start it from the repository root with:
+
+```powershell
+uvicorn apps.api.main:app --reload
+```
+
+Run a selected polygon against the server-owned, provenance-controlled Kharghar fixture:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/analysis-runs/multimodal -Method Post -ContentType 'application/json' -Body (@{aoi=@{type='Polygon';coordinates=@(@(@(73.05,19.03),@(73.09,19.03),@(73.09,19.07),@(73.05,19.07),@(73.05,19.03)))}} | ConvertTo-Json -Depth 10
+```
+
+The response is the versioned `person4.v1` `RankingBundle`, including ranked candidates, explanations, confidence-calibrated stability, and evaluation output. A client may still provide an explicit `ranking_request` for a production data adapter, but the public route no longer requires knowledge of internal table layout.
