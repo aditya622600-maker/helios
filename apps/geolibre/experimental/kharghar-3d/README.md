@@ -61,6 +61,16 @@ loads. Enable the Map Tiles API and restrict the key to the Helios domains.
 Never commit a key to this repository. Google attribution must remain visible
 in the tiles control.
 
+## Digital-twin interaction pattern
+
+The viewer follows the useful visual pattern from God's Eye View without
+copying its unrelated intelligence layers: a realistic globe is the backdrop,
+the selected AOI becomes the active scene, and Helios overlays remain separate,
+identified, and source-labeled. Selecting a polygon now automatically focuses
+the 3D camera on that AOI. Building rankings, rooftop annotations, and solar
+factors are then rendered as Helios-owned analytical layers over the physical
+context.
+
 ## Person 3 handoff
 
 Person 3's open PR (#11) was checked before consolidating this scene. It

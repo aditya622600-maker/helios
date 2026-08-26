@@ -191,8 +191,14 @@
       selectionFeature = feature;
       selectionMap.getSource('selection').setData(feature || { type: 'FeatureCollection', features: [] });
       apply3DSelection(feature);
+      if (feature) focusDigitalTwinAOI(feature);
       const n = feature ? feature.geometry.coordinates[0].length - 1 : 0;
       showSelectionStatus(feature ? `${feature.properties.selection_mode} selected · ${n} corners · ready for analysis` : 'No region selected.');
+    }
+    function focusDigitalTwinAOI(feature) {
+      const points = feature.geometry.coordinates[0];
+      const bounds = points.reduce((b, point) => b.extend(point), new maplibregl.LngLatBounds(points[0], points[0]));
+      map.fitBounds(bounds, { padding: { top: 90, right: 330, bottom: 70, left: 330 }, maxZoom: 17.5, duration: 900 });
     }
     function apply3DSelection(feature) {
       if (!map.getLayer('osm-buildings') && !map.getLayer('local-buildings-3d')) return;
