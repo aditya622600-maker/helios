@@ -168,8 +168,9 @@
             tilesetUrl: 'https://tile.googleapis.com/v1/3dtiles/root.json',
             requestHeaders: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY },
           });
+          digitalTwinTilesControl = tilesControl;
           map.addControl(tilesControl, 'top-right');
-          return tilesControl.loadTileset();
+          return tilesControl.loadTileset().then(() => tilesControl.setVisible(Boolean(selectionFeature)));
         }).catch(error => console.warn('Optional Google 3D Tiles unavailable:', error));
       }
     });
@@ -179,6 +180,7 @@
     let selectionFeature;
     let all3DBuildings = null;
     let selectedAnalysis = null;
+    let digitalTwinTilesControl = null;
     const USABLE_ROOF_FRACTION = 0.70;
     // Add a factor here when a new model/data product becomes available.
     const ANALYSIS_FACTORS = {
@@ -198,6 +200,7 @@
       selectionFeature = feature;
       selectionMap.getSource('selection').setData(feature || { type: 'FeatureCollection', features: [] });
       apply3DSelection(feature);
+      if (digitalTwinTilesControl) digitalTwinTilesControl.setVisible(Boolean(feature));
       if (feature) focusDigitalTwinAOI(feature);
       const n = feature ? feature.geometry.coordinates[0].length - 1 : 0;
       showSelectionStatus(feature ? `${feature.properties.selection_mode} selected · ${n} corners · ready for analysis` : 'No region selected.');
