@@ -17,6 +17,9 @@
     .analysis-panel.collapsed { transform: translateX(calc(100% + 16px)); opacity: 0; pointer-events: none; }
     .analysis-panel-toggle { position: absolute; z-index: 4; top: 16px; right: 16px; }
     .analysis-panel.collapsed + .analysis-panel-toggle { right: 16px; }
+    .controls-panel.collapsed { transform: translateX(calc(-100% - 16px)); opacity: 0; pointer-events: none; }
+    .controls-panel { transition: transform .2s ease, opacity .2s ease; }
+    .controls-panel-toggle { position: absolute; z-index: 4; top: 16px; left: 16px; }
     .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .panel-heading h2 { margin: 0; font-size: 15px; }
     .panel-heading button { padding: 4px 7px; }
@@ -40,8 +43,8 @@
   </style>
 </head>
 <body>
-  <aside class="panel" aria-label="Helios map controls">
-    <h1>Helios · Kharghar</h1>
+  <aside id="controlsPanel" class="panel controls-panel" aria-label="Helios map controls">
+    <div class="panel-heading"><h1>Helios · Kharghar</h1><button id="hideControls" aria-label="Hide Helios controls">Hide</button></div>
     <p>Exploratory only · real public sample layers · not an engineering layer</p>
     <div class="tabs" role="tablist" aria-label="Map views">
       <button id="threeDTab" class="active" role="tab" aria-selected="true">3D viewer</button>
@@ -66,6 +69,7 @@
       <div id="selectionStatus" class="status">No region selected.</div>
     </section>
   </aside>
+  <button id="showControls" class="controls-panel-toggle" aria-label="Show Helios controls" hidden>Show controls</button>
   <aside id="analysisPanel" class="analysis-panel" aria-label="Candidate analysis">
     <div class="panel-heading"><h2>Candidate analysis</h2><button id="hideAnalysis" aria-label="Hide analysis panel">Hide</button></div>
     <p>Choose a factor to compare buildings in the selected region. Footprints and tagged heights come from the bundled OSM-derived GeoJSON. Irradiance and yield are currently labeled proxies, not measured database values.</p>
@@ -404,6 +408,11 @@
     const showAnalysis = document.getElementById('showAnalysis');
     hideAnalysis.addEventListener('click', () => { analysisPanel.classList.add('collapsed'); showAnalysis.hidden = false; });
     showAnalysis.addEventListener('click', () => { analysisPanel.classList.remove('collapsed'); showAnalysis.hidden = true; });
+    const controlsPanel = document.getElementById('controlsPanel');
+    const hideControls = document.getElementById('hideControls');
+    const showControls = document.getElementById('showControls');
+    hideControls.addEventListener('click', () => { controlsPanel.classList.add('collapsed'); showControls.hidden = false; });
+    showControls.addEventListener('click', () => { controlsPanel.classList.remove('collapsed'); showControls.hidden = true; });
     const pitch = document.getElementById('pitch');
     const pitchValue = document.getElementById('pitchValue');
     pitch.addEventListener('input', () => { pitchValue.value = `${pitch.value}°`; map.setPitch(Number(pitch.value)); });
