@@ -204,6 +204,7 @@ direction, units, missing policies and named weight presets.
 - [Team workflow](docs/TEAM_WORKFLOW.md)
 - [Six-person step-by-step execution plan](docs/SIX_PERSON_EXECUTION_PLAN.md)
 - [Data and citations](docs/data/DATA_AND_PROVENANCE.md)
+- [Maharashtra regional acquisition manifest](data/manifests/maharashtra-v1.json)
 - [GOBS access finding and public fallback](docs/data/GOBS_ACCESS_AND_FALLBACK.md)
 - [Temporal alignment](docs/data/TEMPORAL_ALIGNMENT.md)
 - [Ranking and validation](docs/evaluation/RANKING_VALIDATION.md)
@@ -211,6 +212,16 @@ direction, units, missing policies and named weight presets.
 - [API contract](docs/api/API_CONTRACT.md)
 - [Hackathon runbook](docs/HACKATHON_RUNBOOK.md)
 - [Contributing](CONTRIBUTING.md)
+
+### Planning the Maharashtra data expansion
+
+Kharghar remains the small, reproducible demo AOI. Maharashtra-wide acquisition is staged outside Git because the source files are large. Generate the Copernicus tile and Global Solar Atlas acquisition plan with:
+
+```powershell
+python scripts/ingestion/plan_regional_sources.py --aoi-id maharashtra-v1 --bbox 72.6 15.5 80.9 22.1 --output tmp/maharashtra-source-plan.json
+```
+
+The planning bbox is not a legal/state boundary. Before scoring statewide candidates, supply an approved Maharashtra administrative boundary, clip all layers to it, record checksums, and add the resulting source manifests.
 
 ## License status
 
