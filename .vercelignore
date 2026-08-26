@@ -19,3 +19,4 @@ scripts/
 docs/
 output/
 *.md
+tmp_ruff_test.py
