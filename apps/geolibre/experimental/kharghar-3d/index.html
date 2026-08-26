@@ -106,6 +106,8 @@
       map.getStyle().layers.filter(layer => /building/i.test(layer.id)).forEach(layer => map.setLayoutProperty(layer.id, 'visibility', 'none'));
       map.addSource('openfreemap', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
       const firstSymbol = map.getStyle().layers.find(layer => layer.type === 'symbol');
+      map.addSource('sentinel-2-cloudless', { type: 'raster', tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg'], tileSize: 256, maxzoom: 16, attribution: 'Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2024)' });
+      map.addLayer({ id: 'sentinel-2-imagery', type: 'raster', source: 'sentinel-2-cloudless', paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } }, firstSymbol && firstSymbol.id);
       map.addLayer({
         id: 'osm-buildings', source: 'openfreemap', 'source-layer': 'building', type: 'fill-extrusion', minzoom: 14,
         filter: ['!=', ['get', 'hide_3d'], true],
@@ -341,6 +343,9 @@
       selectionMap.addControl(new maplibregl.NavigationControl(), 'bottom-right');
       selectionMap.on('load', () => {
         selectionMap.getStyle().layers.filter(layer => /building/i.test(layer.id)).forEach(layer => selectionMap.setLayoutProperty(layer.id, 'visibility', 'none'));
+        selectionMap.addSource('sentinel-2-cloudless', { type: 'raster', tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg'], tileSize: 256, maxzoom: 16, attribution: 'Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2024)' });
+        const selectionFirstSymbol = selectionMap.getStyle().layers.find(layer => layer.type === 'symbol');
+        selectionMap.addLayer({ id: 'sentinel-2-imagery', type: 'raster', source: 'sentinel-2-cloudless', paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } }, selectionFirstSymbol && selectionFirstSymbol.id);
         selectionMap.addSource('selection-osm-buildings', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
         selectionMap.addLayer({ id: 'selection-osm-building-fill', source: 'selection-osm-buildings', 'source-layer': 'building', type: 'fill', paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.5 } });
         selectionMap.addLayer({ id: 'selection-osm-building-line', source: 'selection-osm-buildings', 'source-layer': 'building', type: 'line', paint: { 'line-color': '#1e40af', 'line-width': 1.2 } });
