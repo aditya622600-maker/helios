@@ -281,7 +281,12 @@
     function featureContainsFeature(region, building) {
       const ring = region.geometry.coordinates[0];
       const coords = building.geometry.type === 'Polygon' ? building.geometry.coordinates[0] : building.geometry.coordinates[0][0];
-      return coords.every(point => pointInRing(point, ring));
+      // Use the footprint centroid for AOI membership. Requiring every vertex
+      // to be inside made normal buildings disappear whenever a polygon
+      // crossed a street-facing edge; the visual boundary rule is handled by
+      // the strict point test and the full footprint remains available to ML.
+      const centroid = coords.reduce((sum, point) => [sum[0] + point[0] / coords.length, sum[1] + point[1] / coords.length], [0, 0]);
+      return pointInRing(centroid, ring);
     }
     function finishPolygon() {
       if (selectionPoints.length < 3) return;
