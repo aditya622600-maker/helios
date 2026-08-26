@@ -208,7 +208,21 @@
         map.setLayoutProperty('osm-buildings', 'visibility', feature ? 'none' : 'visible');
       }
       if (all3DBuildings && map.getSource('local-buildings-3d')) {
-        const visible = feature ? all3DBuildings.features.filter(f => featureContainsFeature(feature, f)) : all3DBuildings.features;
+        let visible = feature ? all3DBuildings.features.filter(f => featureContainsFeature(feature, f)) : all3DBuildings.features;
+        if (feature && visible.length === 0) {
+          // A hand-drawn polygon can miss every simplified footprint vertex.
+          // Use its extent as a safe visual recovery so the scene never blanks.
+          const ring = feature.geometry.coordinates[0];
+          const west = Math.min(...ring.map(point => point[0]));
+          const east = Math.max(...ring.map(point => point[0]));
+          const south = Math.min(...ring.map(point => point[1]));
+          const north = Math.max(...ring.map(point => point[1]));
+          visible = all3DBuildings.features.filter(building => {
+            const coords = building.geometry.type === 'Polygon' ? building.geometry.coordinates[0] : building.geometry.coordinates[0][0];
+            const center = coords.reduce((sum, point) => [sum[0] + point[0] / coords.length, sum[1] + point[1] / coords.length], [0, 0]);
+            return center[0] >= west && center[0] <= east && center[1] >= south && center[1] <= north;
+          });
+        }
         selectedAnalysis = feature ? { features: visible } : null;
         const runButton = document.getElementById('runAnalysis');
         if (runButton) runButton.disabled = !feature;
@@ -219,6 +233,7 @@
         if (map.getLayer('local-buildings-3d')) map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', '#60a5fa');
         if (map.getLayer('usable-roofs-3d')) map.setPaintProperty('usable-roofs-3d', 'fill-extrusion-color', '#0ea5e9');
         document.getElementById('rankingList').textContent = feature ? `${visible.length} buildings in the selected region. Choose a factor and run analysis.` : 'Choose a factor and run analysis.';
+        map.triggerRepaint();
       } else if (feature && map.getLayer('local-buildings-3d')) {
         // Keep the local source visible while its asynchronous GeoJSON fetch
         // completes; otherwise selecting quickly makes the 3D scene appear empty.
