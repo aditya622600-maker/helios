@@ -37,6 +37,42 @@ class EconomicFeature:
     provenance_ids: tuple[str, ...]
 
 
+def calculate_access_cost_feature(
+    *, road_distance_m: float | None, grid_distance_m: float | None,
+    repairability_score: float | None, base_capex_inr: float | None,
+) -> dict[str, float | None]:
+    """Estimate logistics/access additions from OSM context without hiding missing data."""
+    for name, value in (("road_distance_m", road_distance_m), ("grid_distance_m", grid_distance_m)):
+        if value is not None and value < 0:
+            raise ValueError(f"{name} must be non-negative")
+    if repairability_score is not None and not 0 <= repairability_score <= 1:
+        raise ValueError("repairability_score must be in [0, 1]")
+    if base_capex_inr is not None and base_capex_inr < 0:
+        raise ValueError("base_capex_inr must be non-negative")
+    logistics = (
+        (road_distance_m or 0) * 12.0 + (grid_distance_m or 0) * 4.0
+        if road_distance_m is not None and grid_distance_m is not None else None
+    )
+    repairability_adder = (
+        (1.0 - repairability_score) * (base_capex_inr or 0) * 0.08
+        if repairability_score is not None and base_capex_inr is not None else None
+    )
+    total = (
+        (base_capex_inr or 0) + (logistics or 0) + (repairability_adder or 0)
+        if (
+            base_capex_inr is not None
+            and logistics is not None
+            and repairability_adder is not None
+        )
+        else None
+    )
+    return {
+        "logistics_cost_inr": logistics,
+        "repairability_adder_inr": repairability_adder,
+        "estimated_total_cost_inr": total,
+    }
+
+
 def calculate_economic_feature(
     *, installable_capacity_kwp: float, annual_yield_kwh: float, economics: EconomicsInput
 ) -> EconomicFeature:
