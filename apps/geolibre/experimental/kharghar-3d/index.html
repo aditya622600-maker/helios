@@ -87,6 +87,8 @@
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>
+    // Optional visual context only. Set this at deploy time; never commit a key.
+    const GOOGLE_MAPS_API_KEY = window.HELIOS_GOOGLE_MAPS_API_KEY || '';
     const map = new maplibregl.Map({
       container: 'map',
       center: [73.0697, 19.0468],
@@ -149,6 +151,20 @@
         new maplibregl.Popup({ closeButton: false, closeOnClick: false }).setLngLat(event.lngLat).setHTML(`<strong>Solar rooftop</strong><br>roof area: ${p.roof_area_m2} m²<br>usable rooftop area: ${p.usable_roof_area_m2} m²<br>usable estimate: ${Math.round(USABLE_ROOF_FRACTION * 100)}%`).addTo(map);
       });
       map.on('mouseleave', 'usable-roofs-3d', () => { map.getCanvas().style.cursor = ''; document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove()); });
+      // GeoLibre's MapLibre 3D-Tiles integration. A failed optional layer must
+      // never prevent the core selector, rankings, or local buildings from booting.
+      if (GOOGLE_MAPS_API_KEY) {
+        import('https://cdn.jsdelivr.net/npm/maplibre-gl-3d-tiles@0.1.0/+esm').then(({ ThreeDTilesControl }) => {
+          const tilesControl = new ThreeDTilesControl({
+            collapsed: true,
+            layerName: 'Google Photorealistic 3D context',
+            tilesetUrl: 'https://tile.googleapis.com/v1/3dtiles/root.json',
+            requestHeaders: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY },
+          });
+          map.addControl(tilesControl, 'top-right');
+          return tilesControl.loadTileset();
+        }).catch(error => console.warn('Optional Google 3D Tiles unavailable:', error));
+      }
     });
     let selectionMap;
     let selectionMode = null;
