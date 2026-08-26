@@ -51,9 +51,6 @@
         if (overlay) map.removeControl(overlay);
         clearTimeout(watchdog);
 
-        // Google currently documents root.json, while its release notes also
-        // reference /root. Try the documented endpoint first and the alternate
-        // only when Google reports that the entity does not exist.
         const rootCandidates = [
           'https://tile.googleapis.com/v1/3dtiles/root.json',
           'https://tile.googleapis.com/v1/3dtiles/root'
@@ -106,14 +103,14 @@
           },
           onTileError: (tile, message, url) => {
             console.error('Google 3D tile failed', { tile, message, url });
-            setStatus(`Google tile failed: ${message || 'request rejected'}. Check Map Tiles API, billing and localhost referrer restrictions.`, 'error');
+            setStatus(`Google tile failed: ${message || 'request rejected'}. Check Map Tiles API, billing and authorized-site restrictions.`, 'error');
           }
         });
 
         overlay = new deck.MapboxOverlay({ interleaved: false, layers: [tiles] });
         map.addControl(overlay);
         map.easeTo({ center: [73.0697, 19.0468], zoom: 16.4, pitch: 68, bearing: -18, duration: 700 });
-        watchdog = setTimeout(() => setStatus('No 3D tile finished after 20 seconds. The key reached the renderer, but Google is rejecting or not returning child tiles. Check Map Tiles API enablement, billing and HTTP referrer restrictions.', 'error'), 20000);
+        watchdog = setTimeout(() => setStatus('No 3D tile finished after 20 seconds. The key reached the renderer, but Google is rejecting or not returning child tiles. Check Map Tiles API enablement, billing and authorized-site restrictions.', 'error'), 20000);
       } catch (error) {
         console.error(error);
         const safeMessage = String(error.message || error).replace(/key=[^&\s]+/gi, 'key=[redacted]');
