@@ -52,7 +52,6 @@
     <p>Exploratory only · real public sample layers · not an engineering layer</p>
     <div class="tabs" role="tablist" aria-label="Map views">
       <button id="threeDTab" class="active" role="tab" aria-selected="true">3D viewer</button>
-      <button id="cesiumTab" role="tab" aria-selected="false">Cesium 3D</button>
       <button id="selectionTab" role="tab" aria-selected="false">Select region</button>
     </div>
     <section id="threeDControls">
@@ -93,7 +92,7 @@
   </aside>
   <button id="showAnalysis" class="analysis-panel-toggle" aria-label="Show analysis panel" hidden>Show rankings</button>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
-  <div id="cesiumMap" class="view" role="application" aria-label="Cesium high-definition 3D view"><div id="cesiumStatus" class="cesium-status">Cesium 3D Tiles staging view. Add a restricted read-only ion token to enable streaming.</div></div>
+  <div id="cesiumMap" class="view" role="application" aria-label="Cesium high-definition 3D view"><div id="cesiumStatus" class="cesium-status">Add a restricted read-only Cesium ion token to enable high-definition 3D tiles.</div></div>
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.126/Build/Cesium/Cesium.js"></script>
@@ -160,6 +159,7 @@
         new maplibregl.Popup({ closeButton: false, closeOnClick: false }).setLngLat(event.lngLat).setHTML(`<strong>Solar rooftop</strong><br>roof area: ${p.roof_area_m2} m²<br>usable rooftop area: ${p.usable_roof_area_m2} m²<br>usable estimate: ${Math.round(USABLE_ROOF_FRACTION * 100)}%`).addTo(map);
       });
       map.on('mouseleave', 'usable-roofs-3d', () => { map.getCanvas().style.cursor = ''; document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove()); });
+      initCesiumViewer();
     });
     let selectionMap;
     let selectionMode = null;
@@ -344,13 +344,9 @@
       // A small geographic tolerance makes the first visible vertex easy to click.
       return Math.abs(a[0] - b[0]) < 0.00018 && Math.abs(a[1] - b[1]) < 0.00018;
     }
-    document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('cesiumTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); document.getElementById('cesiumMap').classList.remove('active'); map.resize(); apply3DSelection(selectionFeature); });
+    document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); if (!cesiumViewer) document.getElementById('cesiumMap').classList.remove('active'); map.resize(); apply3DSelection(selectionFeature); });
     let cesiumViewer;
-    document.getElementById('cesiumTab').addEventListener('click', async () => {
-      document.querySelectorAll('.tabs button').forEach(button => button.classList.remove('active'));
-      document.getElementById('cesiumTab').classList.add('active');
-      document.getElementById('threeDControls').hidden = true; document.getElementById('selectionControls').hidden = true;
-      document.getElementById('map').classList.remove('active'); document.getElementById('selectionMap').classList.remove('active'); document.getElementById('cesiumMap').classList.add('active');
+    async function initCesiumViewer() {
       if (cesiumViewer || !window.Cesium) return;
       const token = window.HELIOS_CESIUM_ION_TOKEN || '';
       if (!token) return;
@@ -358,8 +354,9 @@
       cesiumViewer = new Cesium.Viewer('cesiumMap', { terrain: Cesium.Terrain.fromWorldTerrain(), animation: false, timeline: false, baseLayerPicker: false });
       const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
       cesiumViewer.scene.primitives.add(tileset);
-      document.getElementById('cesiumStatus').textContent = 'Google Photorealistic 3D Tiles loaded · Helios overlays will attach here.';
-    });
+      document.getElementById('map').classList.remove('active'); document.getElementById('cesiumMap').classList.add('active');
+      document.getElementById('cesiumStatus').textContent = 'Google Photorealistic 3D Tiles loaded in the Helios 3D viewer.';
+    }
     document.getElementById('selectionTab').addEventListener('click', () => { document.getElementById('selectionTab').classList.add('active'); document.getElementById('threeDTab').classList.remove('active'); document.getElementById('cesiumTab').classList.remove('active'); document.getElementById('threeDControls').hidden = true; document.getElementById('selectionControls').hidden = false; document.getElementById('map').classList.remove('active'); document.getElementById('cesiumMap').classList.remove('active'); document.getElementById('selectionMap').classList.add('active'); initSelectionMap(); });
     // Rectangle support remains implemented for a future UI toggle, but is intentionally hidden for now.
     document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then click the first point again or double-click to finish.'); });
