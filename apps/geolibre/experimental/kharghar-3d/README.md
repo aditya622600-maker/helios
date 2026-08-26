@@ -9,7 +9,8 @@ out of this page, preserve layer attribution, and label every proxy dataset.
 This is an exploratory GeoLibre/MapLibre scene for the hackathon demo. It is
 intentionally isolated from the official Helios pipeline, but uses a bounded
 OpenStreetMap building extract with real OSM way IDs and height/level tags,
-alongside the checked-in Person 1 Google Open Buildings and Copernicus layers.
+merged with the checked-in Person 1 Google Open Buildings v3/Temporal heights
+and Copernicus layers.
 It must not be used for site selection, engineering, or public claims.
 
 The default viewer now uses the public OpenFreeMap vector-tile source for
@@ -33,9 +34,12 @@ files as MapLibre terrain tiles directly.
 
 The live terrain tiles are displayed with attribution to AWS Terrain Tiles and
 the underlying elevation providers. OSM building data is licensed under ODbL;
-the exact bounded extract URL and height fallback policy are stored in the
-GeoJSON metadata. Person 1 footprints are drawn as yellow reference outlines,
-while OSM buildings provide the main 3D model. Terrain exaggeration is
+Google Open Buildings is licensed under CC BY 4.0. The local analytical layer
+is the union of both provided building datasets. Spatially matched records use
+the arithmetic mean when both sources supply height, retain the one available
+height when only one does, and remain null when neither does. No synthetic
+display height is used. The policy and per-record inputs are stored in the
+merged GeoJSON metadata/properties. Terrain exaggeration is
 deliberately independent: it never scales or relocates buildings. Building
 bases are clamped to the terrain datum, so no height control can lift them.
 
@@ -51,15 +55,55 @@ available at `https://share.geolibre.app/giswqs/3d-tiles`; a Kharghar-specific
 photogrammetry tileset would require a separate licensed 3D capture or a
 locally generated tileset.
 
-## Google Photorealistic 3D Tiles
+## High-fidelity AOI viewer (MapLibre + Cesium ion data)
 
-The viewer can load Google Photorealistic 3D Tiles directly through
-GeoLibre's `maplibre-gl-3d-tiles` integration. These tiles are visual context
-only; Helios analysis continues to use its own building and solar datasets.
-At deploy time, define `window.HELIOS_GOOGLE_MAPS_API_KEY` before this module
-loads. Enable the Map Tiles API and restrict the key to the Helios domains.
-Never commit a key to this repository. Google attribution must remain visible
-in the tiles control.
+The application does **not** use the CesiumJS viewer and it does not create a
+second 3D tab. MapLibre remains the map, camera, AOI selector, and UI. A deck.gl
+`MapboxOverlay` synchronizes with MapLibre and its `Tile3DLayer` uses
+loaders.gl's `CesiumIonLoader` to stream the configured Cesium ion asset.
+
+The lifecycle is deliberately fail-safe:
+
+1. With no AOI, Helios shows its rough public building layer.
+2. Closing a polygon filters the analytical buildings and focuses the MapLibre
+   camera.
+3. Helios requests `/api/cesium-config` and starts the ion layer for that AOI.
+4. Rough buildings remain visible until the first renderable 3D tile arrives.
+5. If configuration, coverage, or loading fails, the status box explains the
+   failure and the rough buildings remain usable.
+6. When tiles arrive, the layer is clipped to the AOI's rectangular envelope
+   and the exact polygon is drawn as a translucent annotation. Exact arbitrary
+   polygon clipping of a photogrammetry mesh is a later custom-shader task.
+
+The ion asset is visual context only. Rooftop ranking continues to use the
+separate, source-labelled Helios building and solar datasets; textured pixels
+are never silently converted into analytical measurements.
+
+### Required configuration
+
+Create a dedicated Cesium ion token named `helios-maplibre-viewer` with only
+the public `assets:read` scope. Restrict it to the selected 3D asset and to the
+deployment URL. Do not use the account default token and do not commit a token.
+
+Set these Vercel environment variables:
+
+```text
+CESIUM_ION_ACCESS_TOKEN=<paste in Vercel, never in Git>
+CESIUM_ION_ASSET_ID=2275207
+```
+
+Asset `2275207` is Cesium ion's Google Photorealistic 3D Tiles entry. Its city
+coverage is not worldwide, so a successful token does not prove that Kharghar
+has photorealistic mesh coverage. For guaranteed Kharghar fidelity, upload a
+licensed/user-owned local photo, drone, LiDAR, mesh, or Gaussian-splat capture
+to ion, tile it there, and replace `CESIUM_ION_ASSET_ID` with that asset ID.
+
+Although the token is supplied through a runtime endpoint for easy rotation,
+it reaches the browser because the browser must request the tiles. Security
+therefore comes from the ion token's minimal scope, selected-asset restriction,
+allowed-URL restriction, and usage monitoring—not from pretending it remains
+a server secret. The viewer keeps Cesium and source attribution visible while
+the ion layer is active.
 
 ## Digital-twin interaction pattern
 
