@@ -292,7 +292,10 @@
       // crossed a street-facing edge; the visual boundary rule is handled by
       // the strict point test and the full footprint remains available to ML.
       const centroid = coords.reduce((sum, point) => [sum[0] + point[0] / coords.length, sum[1] + point[1] / coords.length], [0, 0]);
-      return pointInRing(centroid, ring);
+      // Include footprints whose centroid or at least one corner is inside.
+      // This keeps ordinary buildings visible for practical hand-drawn AOIs
+      // while still excluding geometry wholly outside the selected region.
+      return pointInRing(centroid, ring) || coords.some(point => pointInRing(point, ring));
     }
     function finishPolygon() {
       if (selectionPoints.length < 3) return;
