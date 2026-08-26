@@ -51,6 +51,16 @@ available at `https://share.geolibre.app/giswqs/3d-tiles`; a Kharghar-specific
 photogrammetry tileset would require a separate licensed 3D capture or a
 locally generated tileset.
 
+## Google Photorealistic 3D Tiles
+
+The viewer can load Google Photorealistic 3D Tiles directly through
+GeoLibre's `maplibre-gl-3d-tiles` integration. These tiles are visual context
+only; Helios analysis continues to use its own building and solar datasets.
+At deploy time, define `window.HELIOS_GOOGLE_MAPS_API_KEY` before this module
+loads. Enable the Map Tiles API and restrict the key to the Helios domains.
+Never commit a key to this repository. Google attribution must remain visible
+in the tiles control.
+
 ## Person 3 handoff
 
 Person 3's open PR (#11) was checked before consolidating this scene. It

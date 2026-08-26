@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Helios · Kharghar solar scouting</title>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
-  <link href="https://cesium.com/downloads/cesiumjs/releases/1.126/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <style>
     :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
     html, body, #map { height: 100%; margin: 0; }
@@ -41,8 +40,6 @@
     .how-to li { margin: 3px 0; }
     .status { margin-top: 10px; padding: 8px; border-radius: 6px; background: #0f172a; font-size: 11px; color: #cbd5e1; }
     .maplibregl-popup-content { color: #0f172a; font-size: 12px; }
-    #cesiumMap { min-height: 620px; height: 100%; background: #0b1220; }
-    .cesium-status { position: absolute; z-index: 2; top: 16px; left: 50%; transform: translateX(-50%); padding: 8px 12px; border-radius: 6px; background: #101827e8; color: #cbd5e1; font-size: 12px; }
     @media (max-width: 700px) { .panel, .analysis-panel { max-width: calc(100vw - 32px); width: auto; } .analysis-panel { top: 62px; } }
   </style>
 </head>
@@ -92,11 +89,17 @@
   </aside>
   <button id="showAnalysis" class="analysis-panel-toggle" aria-label="Show analysis panel" hidden>Show rankings</button>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
-  <div id="cesiumMap" class="view" role="application" aria-label="Cesium high-definition 3D view"><div id="cesiumStatus" class="cesium-status">Add a restricted read-only Cesium ion token to enable high-definition 3D tiles.</div></div>
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://cesium.com/downloads/cesiumjs/releases/1.126/Build/Cesium/Cesium.js"></script>
-  <script>
+  <script type="importmap">
+    {"imports":{"maplibre-gl":"https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.mjs","maplibre-gl-3d-tiles":"https://cdn.jsdelivr.net/npm/maplibre-gl-3d-tiles@0.1.0/+esm"}}
+  </script>
+  <script type="module">
+    import * as maplibregl from 'maplibre-gl';
+    import { ThreeDTilesControl } from 'maplibre-gl-3d-tiles';
+
+    // Set this at deploy time with a domain-restricted Google Maps API key.
+    // Never commit a real key here. The 3D layer is visual context only.
+    const GOOGLE_MAPS_API_KEY = window.HELIOS_GOOGLE_MAPS_API_KEY || '';
     const map = new maplibregl.Map({
       container: 'map',
       center: [73.0697, 19.0468],
@@ -159,7 +162,16 @@
         new maplibregl.Popup({ closeButton: false, closeOnClick: false }).setLngLat(event.lngLat).setHTML(`<strong>Solar rooftop</strong><br>roof area: ${p.roof_area_m2} m²<br>usable rooftop area: ${p.usable_roof_area_m2} m²<br>usable estimate: ${Math.round(USABLE_ROOF_FRACTION * 100)}%`).addTo(map);
       });
       map.on('mouseleave', 'usable-roofs-3d', () => { map.getCanvas().style.cursor = ''; document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove()); });
-      initCesiumViewer();
+      if (GOOGLE_MAPS_API_KEY) {
+        const tilesControl = new ThreeDTilesControl({
+          collapsed: true,
+          layerName: 'Google Photorealistic 3D context',
+          tilesetUrl: `https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
+          requestHeaders: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY },
+        });
+        map.addControl(tilesControl, 'top-right');
+        void tilesControl.loadTileset();
+      }
     });
     let selectionMap;
     let selectionMode = null;
@@ -344,20 +356,8 @@
       // A small geographic tolerance makes the first visible vertex easy to click.
       return Math.abs(a[0] - b[0]) < 0.00018 && Math.abs(a[1] - b[1]) < 0.00018;
     }
-    document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); if (!cesiumViewer) document.getElementById('cesiumMap').classList.remove('active'); map.resize(); apply3DSelection(selectionFeature); });
-    let cesiumViewer;
-    async function initCesiumViewer() {
-      if (cesiumViewer || !window.Cesium) return;
-      const token = window.HELIOS_CESIUM_ION_TOKEN || '';
-      if (!token) return;
-      Cesium.Ion.defaultAccessToken = token;
-      cesiumViewer = new Cesium.Viewer('cesiumMap', { terrain: Cesium.Terrain.fromWorldTerrain(), animation: false, timeline: false, baseLayerPicker: false });
-      const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
-      cesiumViewer.scene.primitives.add(tileset);
-      document.getElementById('map').classList.remove('active'); document.getElementById('cesiumMap').classList.add('active');
-      document.getElementById('cesiumStatus').textContent = 'Google Photorealistic 3D Tiles loaded in the Helios 3D viewer.';
-    }
-    document.getElementById('selectionTab').addEventListener('click', () => { document.getElementById('selectionTab').classList.add('active'); document.getElementById('threeDTab').classList.remove('active'); document.getElementById('cesiumTab').classList.remove('active'); document.getElementById('threeDControls').hidden = true; document.getElementById('selectionControls').hidden = false; document.getElementById('map').classList.remove('active'); document.getElementById('cesiumMap').classList.remove('active'); document.getElementById('selectionMap').classList.add('active'); initSelectionMap(); });
+    document.getElementById('threeDTab').addEventListener('click', () => { document.getElementById('threeDTab').classList.add('active'); document.getElementById('selectionTab').classList.remove('active'); document.getElementById('threeDControls').hidden = false; document.getElementById('selectionControls').hidden = true; document.getElementById('map').classList.add('active'); document.getElementById('selectionMap').classList.remove('active'); map.resize(); apply3DSelection(selectionFeature); });
+    document.getElementById('selectionTab').addEventListener('click', () => { document.getElementById('selectionTab').classList.add('active'); document.getElementById('threeDTab').classList.remove('active'); document.getElementById('threeDControls').hidden = true; document.getElementById('selectionControls').hidden = false; document.getElementById('map').classList.remove('active'); document.getElementById('selectionMap').classList.add('active'); initSelectionMap(); });
     // Rectangle support remains implemented for a future UI toggle, but is intentionally hidden for now.
     document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then click the first point again or double-click to finish.'); });
     document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateDraft([]); updateSelection(null); });
