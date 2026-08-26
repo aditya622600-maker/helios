@@ -213,6 +213,12 @@
         if (map.getLayer('local-buildings-3d')) map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', '#60a5fa');
         if (map.getLayer('usable-roofs-3d')) map.setPaintProperty('usable-roofs-3d', 'fill-extrusion-color', '#0ea5e9');
         document.getElementById('rankingList').textContent = feature ? `${visible.length} buildings in the selected region. Choose a factor and run analysis.` : 'Choose a factor and run analysis.';
+      } else if (feature && map.getLayer('local-buildings-3d')) {
+        // Keep the local source visible while its asynchronous GeoJSON fetch
+        // completes; otherwise selecting quickly makes the 3D scene appear empty.
+        map.setLayoutProperty('local-buildings-3d', 'visibility', 'visible');
+        if (map.getLayer('usable-roofs-3d')) map.setLayoutProperty('usable-roofs-3d', 'visibility', 'visible');
+        document.getElementById('rankingList').textContent = 'Loading building data for the selected region…';
       }
       if (map.getSource('aoi-3d')) map.getSource('aoi-3d').setData(feature || { type: 'FeatureCollection', features: [] });
       if (map.getSource('analysis-highlight') && !feature) map.getSource('analysis-highlight').setData({ type: 'FeatureCollection', features: [] });
