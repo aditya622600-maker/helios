@@ -90,13 +90,8 @@
   <button id="showAnalysis" class="analysis-panel-toggle" aria-label="Show analysis panel" hidden>Show rankings</button>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
-  <script type="importmap">
-    {"imports":{"maplibre-gl":"https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.mjs","maplibre-gl-3d-tiles":"https://cdn.jsdelivr.net/npm/maplibre-gl-3d-tiles@0.1.0/+esm"}}
-  </script>
-  <script type="module">
-    import * as maplibregl from 'maplibre-gl';
-    import { ThreeDTilesControl } from 'maplibre-gl-3d-tiles';
-
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script>
     // Set this at deploy time with a domain-restricted Google Maps API key.
     // Never commit a real key here. The 3D layer is visual context only.
     const GOOGLE_MAPS_API_KEY = window.HELIOS_GOOGLE_MAPS_API_KEY || '';
@@ -163,14 +158,16 @@
       });
       map.on('mouseleave', 'usable-roofs-3d', () => { map.getCanvas().style.cursor = ''; document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove()); });
       if (GOOGLE_MAPS_API_KEY) {
-        const tilesControl = new ThreeDTilesControl({
-          collapsed: true,
-          layerName: 'Google Photorealistic 3D context',
-          tilesetUrl: `https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
-          requestHeaders: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY },
-        });
-        map.addControl(tilesControl, 'top-right');
-        void tilesControl.loadTileset();
+        import('https://cdn.jsdelivr.net/npm/maplibre-gl-3d-tiles@0.1.0/+esm').then(({ ThreeDTilesControl }) => {
+          const tilesControl = new ThreeDTilesControl({
+            collapsed: true,
+            layerName: 'Google Photorealistic 3D context',
+            tilesetUrl: `https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
+            requestHeaders: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY },
+          });
+          map.addControl(tilesControl, 'top-right');
+          void tilesControl.loadTileset();
+        }).catch(() => { /* Optional 3D context must not block the core viewer. */ });
       }
     });
     let selectionMap;
