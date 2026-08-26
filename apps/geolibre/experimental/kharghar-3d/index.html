@@ -20,9 +20,6 @@
     .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .panel-heading h2 { margin: 0; font-size: 15px; }
     .panel-heading button { padding: 4px 7px; }
-    .controls-panel.collapsed { transform: translateX(calc(-100% - 16px)); opacity: 0; pointer-events: none; }
-    .controls-panel { transition: transform .2s ease, opacity .2s ease; }
-    .controls-panel-toggle { position: absolute; z-index: 4; top: 16px; left: 16px; }
     h1 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
     p { margin: 4px 0 12px; color: #94a3b8; font-size: 12px; line-height: 1.4; }
     label { display: block; margin-top: 10px; font-size: 12px; color: #cbd5e1; }
@@ -40,12 +37,11 @@
     .how-to li { margin: 3px 0; }
     .status { margin-top: 10px; padding: 8px; border-radius: 6px; background: #0f172a; font-size: 11px; color: #cbd5e1; }
     .maplibregl-popup-content { color: #0f172a; font-size: 12px; }
-    @media (max-width: 700px) { .panel, .analysis-panel { max-width: calc(100vw - 32px); width: auto; } .analysis-panel { top: 62px; } }
   </style>
 </head>
 <body>
-  <aside id="controlsPanel" class="panel controls-panel" aria-label="Helios map controls">
-    <div class="panel-heading"><h1>Helios · Kharghar</h1><button id="hideControls" aria-label="Hide map controls">Hide</button></div>
+  <aside class="panel" aria-label="Helios map controls">
+    <h1>Helios · Kharghar</h1>
     <p>Exploratory only · real public sample layers · not an engineering layer</p>
     <div class="tabs" role="tablist" aria-label="Map views">
       <button id="threeDTab" class="active" role="tab" aria-selected="true">3D viewer</button>
@@ -70,7 +66,6 @@
       <div id="selectionStatus" class="status">No region selected.</div>
     </section>
   </aside>
-  <button id="showControls" class="controls-panel-toggle" aria-label="Show map controls" hidden>Show controls</button>
   <aside id="analysisPanel" class="analysis-panel" aria-label="Candidate analysis">
     <div class="panel-heading"><h2>Candidate analysis</h2><button id="hideAnalysis" aria-label="Hide analysis panel">Hide</button></div>
     <p>Choose a factor to compare buildings in the selected region. Footprints and tagged heights come from the bundled OSM-derived GeoJSON. Irradiance and yield are currently labeled proxies, not measured database values.</p>
@@ -92,9 +87,6 @@
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>
-    // Set this at deploy time with a domain-restricted Google Maps API key.
-    // Never commit a real key here. The 3D layer is visual context only.
-    const GOOGLE_MAPS_API_KEY = window.HELIOS_GOOGLE_MAPS_API_KEY || '';
     const map = new maplibregl.Map({
       container: 'map',
       center: [73.0697, 19.0468],
@@ -157,18 +149,6 @@
         new maplibregl.Popup({ closeButton: false, closeOnClick: false }).setLngLat(event.lngLat).setHTML(`<strong>Solar rooftop</strong><br>roof area: ${p.roof_area_m2} m²<br>usable rooftop area: ${p.usable_roof_area_m2} m²<br>usable estimate: ${Math.round(USABLE_ROOF_FRACTION * 100)}%`).addTo(map);
       });
       map.on('mouseleave', 'usable-roofs-3d', () => { map.getCanvas().style.cursor = ''; document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove()); });
-      if (GOOGLE_MAPS_API_KEY) {
-        import('https://cdn.jsdelivr.net/npm/maplibre-gl-3d-tiles@0.1.0/+esm').then(({ ThreeDTilesControl }) => {
-          const tilesControl = new ThreeDTilesControl({
-            collapsed: true,
-            layerName: 'Google Photorealistic 3D context',
-            tilesetUrl: `https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
-            requestHeaders: { 'X-GOOG-API-KEY': GOOGLE_MAPS_API_KEY },
-          });
-          map.addControl(tilesControl, 'top-right');
-          void tilesControl.loadTileset();
-        }).catch(() => { /* Optional 3D context must not block the core viewer. */ });
-      }
     });
     let selectionMap;
     let selectionMode = null;
@@ -366,11 +346,6 @@
     const showAnalysis = document.getElementById('showAnalysis');
     hideAnalysis.addEventListener('click', () => { analysisPanel.classList.add('collapsed'); showAnalysis.hidden = false; });
     showAnalysis.addEventListener('click', () => { analysisPanel.classList.remove('collapsed'); showAnalysis.hidden = true; });
-    const controlsPanel = document.getElementById('controlsPanel');
-    const hideControls = document.getElementById('hideControls');
-    const showControls = document.getElementById('showControls');
-    hideControls.addEventListener('click', () => { controlsPanel.classList.add('collapsed'); showControls.hidden = false; });
-    showControls.addEventListener('click', () => { controlsPanel.classList.remove('collapsed'); showControls.hidden = true; });
     const pitch = document.getElementById('pitch');
     const pitchValue = document.getElementById('pitchValue');
     pitch.addEventListener('input', () => { pitchValue.value = `${pitch.value}°`; map.setPitch(Number(pitch.value)); });
