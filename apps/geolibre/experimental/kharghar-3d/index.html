@@ -84,11 +84,14 @@
   <button id="showControls" class="controls-panel-toggle" aria-label="Show Helios controls" hidden>Show controls</button>
   <aside id="analysisPanel" class="analysis-panel" aria-label="Candidate analysis">
     <div class="panel-heading"><h2>Candidate analysis</h2><button id="hideAnalysis" aria-label="Hide analysis panel">Hide</button></div>
-    <p>Choose a factor to compare buildings in the selected region. Footprints are fused from Google, Microsoft, and Overture; heights combine published vector values with DLR WSF3D context. Irradiance and yield remain labeled proxies.</p>
-    <label for="factorSelect">Rank buildings by</label>
-    <select id="factorSelect"><option value="height">Building height</option><option value="usable_area">Usable rooftop area</option><option value="irradiance">Irradiance</option><option value="yield">Annual solar yield</option></select>
+    <p>Run the registered analysis API when it is available. The browser keeps a clearly labelled local visual fallback only for map exploration.</p>
+    <label for="analysisApiUrl">Analysis API</label>
+    <input id="analysisApiUrl" type="url" value="http://127.0.0.1:8000/analysis-runs/multimodal" aria-label="Analysis API URL">
+    <label for="factorSelect">Local fallback factor</label>
+    <select id="factorSelect"><option value="height">Building height</option><option value="usable_area">Usable rooftop area</option><option value="irradiance">Irradiance proxy</option><option value="yield">Annual solar-yield proxy</option></select>
     <button id="runAnalysis">Run selected-region analysis</button>
-    <div class="legend">Click a result below to locate that building in 3D.</div>
+    <div id="analysisDataStatus" class="status">Data status: waiting for a selected region and API response.</div>
+    <div class="legend">API results show frozen ranking scores, confidence, decision reasons, and provenance. The local fallback is never presented as a ranked decision.</div>
     <div id="rankingList" class="legend">Select a region to enable rankings.</div>
     <div class="status" id="validationSummary">
       <strong>Feasibility &amp; validation</strong>
@@ -450,7 +453,7 @@
       const roof = Math.round(footprintAreaM2(ring));
       return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [inset] }, properties: { ...feature.properties, roof_area_m2: roof, usable_roof_area_m2: Math.round(roof * USABLE_ROOF_FRACTION), roof_height_m: Number(feature.properties.height_m) || 0 } };
     }
-    function runAnalysis() {
+    function renderLocalAnalysis() {
       if (!selectedAnalysis || !selectedAnalysis.features.length) {
         document.getElementById('rankingList').textContent = 'No buildings are fully inside the selected region.';
         return;
@@ -459,7 +462,6 @@
       const factor = ANALYSIS_FACTORS[key];
       const rows = selectedAnalysis.features.map(feature => ({ feature, value: Number(factor.value(feature)) || 0 }));
       rows.sort((a, b) => b.value - a.value);
-      // Percentile/rank scores use the whole colour range even when values are skewed.
       rows.forEach((row, index) => { row.score = rows.length === 1 ? 1 : 1 - (index / (rows.length - 1)); });
       const scored = { type: 'FeatureCollection', features: rows.map(row => ({ ...row.feature, properties: { ...row.feature.properties, analysis_score: row.score, analysis_value: row.value } })) };
       map.getSource('local-buildings-3d').setData(scored);
@@ -467,10 +469,40 @@
       const scoreGradient = ['interpolate', ['linear'], ['get', 'analysis_score'], 0, '#fecaca', 0.25, '#fdba74', 0.5, '#f97316', 0.75, '#dc2626', 1, '#7f1d1d'];
       map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', scoreGradient);
       map.setPaintProperty('usable-roofs-3d', 'fill-extrusion-color', scoreGradient);
-      const ranking = rows.slice(0, 10).map((row, index) => `<button class="ranking-row" data-ranking-index="${index}">${index + 1}. ${row.feature.properties.osm_way_id || 'building'} · ${row.value.toFixed(1)} ${factor.unit} · ${Math.round(row.score * 100)}%</button>`).join('');
-      const citations = (factor.sources || []).map(source => `<a href="${source[1]}" target="_blank" rel="noreferrer">${source[0]}</a>`).join('<br>');
-      document.getElementById('rankingList').innerHTML = `<strong>${factor.label}</strong>${factor.parameters ? `<br><small><b>Parameters:</b> ${factor.parameters}</small>` : ''}${factor.note ? `<br><small>${factor.note}</small>` : ''}${citations ? `<br><small><b>Evidence:</b><br>${citations}</small>` : ''}<br>${ranking || 'No candidates.'}`;
+      const ranking = rows.slice(0, 10).map((row, index) => `<button class="ranking-row" data-ranking-index="${index}">${index + 1}. ${row.feature.properties.osm_way_id || 'building'} · ${row.value.toFixed(1)} ${factor.unit} · visual percentile ${Math.round(row.score * 100)}%</button>`).join('');
+      document.getElementById('analysisDataStatus').textContent = 'Data status: local visual fallback only. Irradiance and yield remain proxies and are not decision rankings.';
+      document.getElementById('rankingList').innerHTML = `<strong>${factor.label} — local visual fallback</strong><br><small>${factor.note || 'No decision-grade source is connected for this local factor.'}</small><br>${ranking || 'No candidates.'}`;
       document.querySelectorAll('.ranking-row').forEach(button => button.addEventListener('click', () => focusRankingBuilding(rows[Number(button.dataset.rankingIndex)]?.feature, button)));
+    }
+    function renderLiveRanking(bundle) {
+      const explanationById = Object.fromEntries((bundle.explanations || []).map(row => [row.candidate_id, row]));
+      const rows = (bundle.ranked_candidates || []).slice().sort((a, b) => (a.rank || 999) - (b.rank || 999));
+      const status = document.getElementById('analysisDataStatus');
+      status.textContent = `Data status: registered API output • assumption ${bundle.assumption_version} • inputs ${Object.entries(bundle.input_versions || {}).map(([k,v]) => `${k}: ${v}`).join(', ') || 'not supplied'}`;
+      document.getElementById('rankingList').innerHTML = rows.map(row => {
+        const explanation = explanationById[row.candidate_id] || {};
+        const reasons = (explanation.positive_reasons || []).join('; ') || 'No positive reason recorded.';
+        const cautions = (explanation.caution_reasons || []).join('; ') || 'No cautions recorded.';
+        const score = row.nominal_score == null ? 'n/a' : (row.nominal_score * 100).toFixed(1) + '%';
+        return `<article class="ranking-row live-result"><strong>#${row.rank || '—'} ${row.candidate_id}</strong> · ${row.decision_status}<br><small>score: ${score} · confidence: ${Math.round((row.overall_confidence || 0) * 100)}% · ${row.eligible ? 'eligible' : 'excluded'}</small><br><small><b>Why:</b> ${reasons}<br><b>Check:</b> ${cautions}</small></article>`;
+      }).join('') || 'The API returned no candidates for this AOI.';
+    }
+    async function runAnalysis() {
+      if (!selectionFeature) {
+        document.getElementById('rankingList').textContent = 'Select a region before running analysis.';
+        return;
+      }
+      const url = document.getElementById('analysisApiUrl').value.trim();
+      if (!url) { renderLocalAnalysis(); return; }
+      document.getElementById('analysisDataStatus').textContent = 'Data status: calling registered analysis API…';
+      try {
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ aoi: selectionFeature.geometry }) });
+        if (!response.ok) throw new Error(`API returned ${response.status}`);
+        renderLiveRanking(await response.json());
+      } catch (error) {
+        document.getElementById('analysisDataStatus').textContent = `Data status: API unavailable (${error.message}). Showing local visual fallback; it is not a decision ranking.`;
+        renderLocalAnalysis();
+      }
     }
     function focusRankingBuilding(feature, button) {
       if (!feature || !map.getSource('analysis-highlight')) return;
