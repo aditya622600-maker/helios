@@ -55,66 +55,6 @@ available at `https://share.geolibre.app/giswqs/3d-tiles`; a Kharghar-specific
 photogrammetry tileset would require a separate licensed 3D capture or a
 locally generated tileset.
 
-## High-fidelity AOI viewer (MapLibre + Cesium ion data)
-
-The application does **not** use the CesiumJS viewer and it does not create a
-second 3D tab. MapLibre remains the map, camera, AOI selector, and UI. A deck.gl
-`MapboxOverlay` synchronizes with MapLibre and its `Tile3DLayer` uses
-loaders.gl's `CesiumIonLoader` to stream the configured Cesium ion asset.
-
-The lifecycle is deliberately fail-safe:
-
-1. With no AOI, Helios shows its rough public building layer.
-2. Closing a polygon filters the analytical buildings and focuses the MapLibre
-   camera.
-3. Helios requests `/api/cesium-config` and starts the ion layer for that AOI.
-4. Rough buildings remain visible until the first renderable 3D tile arrives.
-5. If configuration, coverage, or loading fails, the status box explains the
-   failure and the rough buildings remain usable.
-6. When tiles arrive, the layer is clipped to the AOI's rectangular envelope
-   and the exact polygon is drawn as a translucent annotation. Exact arbitrary
-   polygon clipping of a photogrammetry mesh is a later custom-shader task.
-
-The ion asset is visual context only. Rooftop ranking continues to use the
-separate, source-labelled Helios building and solar datasets; textured pixels
-are never silently converted into analytical measurements.
-
-### Required configuration
-
-Create a dedicated Cesium ion token named `helios-maplibre-viewer` with only
-the public `assets:read` scope. Restrict it to the selected 3D asset and to the
-deployment URL. Do not use the account default token and do not commit a token.
-
-Set these Vercel environment variables:
-
-```text
-CESIUM_ION_ACCESS_TOKEN=<paste in Vercel, never in Git>
-CESIUM_ION_ASSET_ID=2275207
-```
-
-Asset `2275207` is Cesium ion's Google Photorealistic 3D Tiles entry. Its city
-coverage is not worldwide, so a successful token does not prove that Kharghar
-has photorealistic mesh coverage. For guaranteed Kharghar fidelity, upload a
-licensed/user-owned local photo, drone, LiDAR, mesh, or Gaussian-splat capture
-to ion, tile it there, and replace `CESIUM_ION_ASSET_ID` with that asset ID.
-
-Although the token is supplied through a runtime endpoint for easy rotation,
-it reaches the browser because the browser must request the tiles. Security
-therefore comes from the ion token's minimal scope, selected-asset restriction,
-allowed-URL restriction, and usage monitoring—not from pretending it remains
-a server secret. The viewer keeps Cesium and source attribution visible while
-the ion layer is active.
-
-## Digital-twin interaction pattern
-
-The viewer follows the useful visual pattern from God's Eye View without
-copying its unrelated intelligence layers: a realistic globe is the backdrop,
-the selected AOI becomes the active scene, and Helios overlays remain separate,
-identified, and source-labeled. Selecting a polygon now automatically focuses
-the 3D camera on that AOI. Building rankings, rooftop annotations, and solar
-factors are then rendered as Helios-owned analytical layers over the physical
-context.
-
 ## Person 3 handoff
 
 Person 3's open PR (#11) was checked before consolidating this scene. It
