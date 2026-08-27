@@ -484,7 +484,8 @@
         const reasons = (explanation.positive_reasons || []).join('; ') || 'No positive reason recorded.';
         const cautions = (explanation.caution_reasons || []).join('; ') || 'No cautions recorded.';
         const score = row.nominal_score == null ? 'n/a' : (row.nominal_score * 100).toFixed(1) + '%';
-        return `<article class="ranking-row live-result"><strong>#${row.rank || '—'} ${row.candidate_id}</strong> · ${row.decision_status}<br><small>score: ${score} · confidence: ${Math.round((row.overall_confidence || 0) * 100)}% · ${row.eligible ? 'eligible' : 'excluded'}</small><br><small><b>Why:</b> ${reasons}<br><b>Check:</b> ${cautions}</small></article>`;
+        const contributions = Object.entries(row.component_contributions || {}).map(([name, value]) => `${name}: ${(Number(value) * 100).toFixed(1)}`).join(' · ') || 'Contribution trace not supplied.';
+        return `<article class="ranking-row live-result"><strong>#${row.rank || '—'} ${row.candidate_id}</strong> · ${row.decision_status}<br><small>score: ${score} · confidence: ${Math.round((row.overall_confidence || 0) * 100)}% · ${row.eligible ? 'eligible' : 'excluded'}</small><br><small><b>Weighted contribution trace:</b> ${contributions}<br><b>Why:</b> ${reasons}<br><b>Check:</b> ${cautions}</small></article>`;
       }).join('') || 'The API returned no candidates for this AOI.';
     }
     async function runAnalysis() {
