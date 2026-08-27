@@ -684,12 +684,18 @@
           const npv = discountedNetCashflow - capex;
           const profitabilityIndex = capex > 0 ? discountedNetCashflow / capex : 0;
           const lcoe = discountedGeneration > 0 ? (capex + discountedOpex) / discountedGeneration : null;
-          return [{ id: feature.properties.osm_way_id || 'building', capacityKwp, capexPerKwp, energyValue, annualEnergyKwh, capex, annualOpex, annualValue, grossPayback, netPayback, lcoe, npv, profitabilityIndex }];
+          return [{ id: feature.properties.osm_way_id || 'building', feature, capacityKwp, capexPerKwp, energyValue, annualEnergyKwh, capex, annualOpex, annualValue, grossPayback, netPayback, lcoe, npv, profitabilityIndex }];
         }).sort((a, b) => b.profitabilityIndex - a.profitabilityIndex || b.npv - a.npv);
         if (!rows.length) throw new Error('No candidate falls inside the registered government capacity bands.');
         const exclusion = unsupportedCapacities.length ? ` ${unsupportedCapacities.length} candidate(s) outside the published capacity bands were excluded.` : '';
         status.textContent = `Ranked by profitability index from a ${life}-year discounted cash-flow simulation, then NPV. Government capacity bands are applied per building; ${(opexRate * 100).toFixed(1)}% O&M, ${(degradationRate * 100).toFixed(1)}% degradation and ${(rate * 100).toFixed(1)}% WACC are shared assumptions.${exclusion} Rent, tax and debt are excluded.`;
-        list.innerHTML = rows.slice(0, 10).map((row, index) => `<article class="ranking-row"><strong>#${index + 1} ${row.id}</strong> · profitability index ${row.profitabilityIndex.toFixed(2)}<br><small>${row.capacityKwp.toFixed(1)} kWp · ${Math.round(row.annualEnergyKwh).toLocaleString('en-IN')} kWh first year · CAPEX ₹${Math.round(row.capex).toLocaleString('en-IN')} · first-year value ₹${Math.round(row.annualValue).toLocaleString('en-IN')}<br>Building inputs: ₹${row.capexPerKwp.toLocaleString('en-IN')}/kWp · ₹${row.energyValue}/kWh · O&amp;M ₹${Math.round(row.annualOpex).toLocaleString('en-IN')}/year<br>NPV ${row.npv >= 0 ? '' : '−'}₹${Math.abs(Math.round(row.npv)).toLocaleString('en-IN')} · LCOE ₹${row.lcoe.toFixed(2)}/kWh · net payback ${row.netPayback == null ? 'beyond project life' : row.netPayback.toFixed(1) + ' years'} · gross payback ${row.grossPayback.toFixed(1)} years</small></article>`).join('');
+        list.innerHTML = rows.slice(0, 10).map((row, index) => `<button type="button" class="ranking-row" data-economic-index="${index}" aria-label="Open economic rank ${index + 1}, building ${row.id}, in 3D"><strong>#${index + 1} ${row.id}</strong> · profitability index ${row.profitabilityIndex.toFixed(2)}<br><small>${row.capacityKwp.toFixed(1)} kWp · ${Math.round(row.annualEnergyKwh).toLocaleString('en-IN')} kWh first year · CAPEX ₹${Math.round(row.capex).toLocaleString('en-IN')} · first-year value ₹${Math.round(row.annualValue).toLocaleString('en-IN')}<br>Building inputs: ₹${row.capexPerKwp.toLocaleString('en-IN')}/kWp · ₹${row.energyValue}/kWh · O&amp;M ₹${Math.round(row.annualOpex).toLocaleString('en-IN')}/year<br>NPV ${row.npv >= 0 ? '' : '−'}₹${Math.abs(Math.round(row.npv)).toLocaleString('en-IN')} · LCOE ₹${row.lcoe.toFixed(2)}/kWh · net payback ${row.netPayback == null ? 'beyond project life' : row.netPayback.toFixed(1) + ' years'} · gross payback ${row.grossPayback.toFixed(1)} years<br><b>Open this building in 3D →</b></small></button>`).join('');
+        list.querySelectorAll('[data-economic-index]').forEach(button => button.addEventListener('click', () => {
+          const row = rows[Number(button.dataset.economicIndex)];
+          if (!row?.feature) return;
+          document.getElementById('threeDTab').click();
+          window.setTimeout(() => focusRankingBuilding(row.feature, button), 50);
+        }));
       } catch (error) {
         status.textContent = `Scenario cannot run: ${error.message}`;
         list.textContent = '';
