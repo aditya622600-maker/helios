@@ -56,3 +56,6 @@ def test_viewer_exposes_discounted_cashflow_economic_ranking() -> None:
     assert "degradationPct" in viewer
     assert "data-economic-index" in viewer
     assert "focusRankingBuilding(row.feature, button)" in viewer
+    assert "High-fidelity AOI" not in viewer
+    assert "CesiumIonLoader" not in viewer
+    assert "deck.gl" not in viewer
