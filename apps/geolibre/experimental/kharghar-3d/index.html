@@ -109,9 +109,10 @@
       <label>Government energy value (₹/kWh) <input id="energyValuePerKwh" type="number" min="0" step="0.01" readonly placeholder="Select an AOI"></label>
       <div id="economicDataSource" class="status">Select a region to load government economic inputs.</div>
       <label>Annual O&amp;M (% CAPEX) <input id="opexPct" type="number" min="0" step="0.1" value="1.5"></label>
+      <label>Annual generation degradation (%) <input id="degradationPct" type="number" min="0" max="100" step="0.1" value="0.5"></label>
       <label>Project life (years) <input id="projectLifeYears" type="number" min="1" value="25"></label>
       <label>WACC / discount rate (%) <input id="waccPct" type="number" min="0" step="0.1" value="10"></label>
-      <button id="runEconomics" disabled>Estimate economic feasibility for selected region</button>
+      <button id="runEconomics" disabled>Run economic ranking analysis</button>
       <div id="economicsStatus" class="status">Select a region, then run the scenario.</div>
       <div id="economicsList" class="legend"></div>
     </section>
@@ -641,10 +642,10 @@
       }
       try {
         const opexRate = scenarioNumber('opexPct') / 100;
+        const degradationRate = scenarioNumber('degradationPct') / 100;
         const life = scenarioNumber('projectLifeYears');
         const rate = scenarioNumber('waccPct') / 100;
-        if (!life) throw new Error('Project life must be greater than zero.');
-        const crf = rate === 0 ? 1 / life : rate * Math.pow(1 + rate, life) / (Math.pow(1 + rate, life) - 1);
+        if (!life || degradationRate >= 1) throw new Error('Project life must be positive and degradation must be below 100%.');
         const unsupportedCapacities = [];
         const rows = selectedAnalysis.features.flatMap(feature => {
           const roof = toUsableRoof(feature).properties;
@@ -662,14 +663,33 @@
           const annualOpex = capex * opexRate;
           const annualValue = annualEnergyKwh * energyValue;
           const grossPayback = annualValue > 0 ? capex / annualValue : null;
-          const lcoe = annualEnergyKwh > 0 ? (capex * crf + annualOpex) / annualEnergyKwh : null;
-          const score = Math.max(0, Math.min(1, (grossPayback == null ? 0 : 1 - grossPayback / life) * 0.6 + (lcoe == null ? 0 : Math.max(0, 1 - lcoe / energyValue)) * 0.4));
-          return [{ id: feature.properties.osm_way_id || 'building', capacityKwp, capexPerKwp, energyValue, annualEnergyKwh, capex, annualOpex, annualValue, grossPayback, lcoe, score }];
-        }).sort((a, b) => b.score - a.score);
+          let discountedNetCashflow = 0;
+          let discountedGeneration = 0;
+          let discountedOpex = 0;
+          let cumulativeNetCashflow = 0;
+          let netPayback = null;
+          for (let year = 1; year <= life; year += 1) {
+            const yearEnergy = annualEnergyKwh * Math.pow(1 - degradationRate, year - 1);
+            const yearNetCashflow = yearEnergy * energyValue - annualOpex;
+            const discountFactor = Math.pow(1 + rate, year);
+            discountedNetCashflow += yearNetCashflow / discountFactor;
+            discountedGeneration += yearEnergy / discountFactor;
+            discountedOpex += annualOpex / discountFactor;
+            const previousCumulative = cumulativeNetCashflow;
+            cumulativeNetCashflow += yearNetCashflow;
+            if (netPayback == null && cumulativeNetCashflow >= capex && yearNetCashflow > 0) {
+              netPayback = year - 1 + (capex - previousCumulative) / yearNetCashflow;
+            }
+          }
+          const npv = discountedNetCashflow - capex;
+          const profitabilityIndex = capex > 0 ? discountedNetCashflow / capex : 0;
+          const lcoe = discountedGeneration > 0 ? (capex + discountedOpex) / discountedGeneration : null;
+          return [{ id: feature.properties.osm_way_id || 'building', capacityKwp, capexPerKwp, energyValue, annualEnergyKwh, capex, annualOpex, annualValue, grossPayback, netPayback, lcoe, npv, profitabilityIndex }];
+        }).sort((a, b) => b.profitabilityIndex - a.profitabilityIndex || b.npv - a.npv);
         if (!rows.length) throw new Error('No candidate falls inside the registered government capacity bands.');
         const exclusion = unsupportedCapacities.length ? ` ${unsupportedCapacities.length} candidate(s) outside the published capacity bands were excluded.` : '';
-        status.textContent = `${activeGovernmentEconomicProfile.state_name} government capacity bands applied per building; ${(opexRate * 100).toFixed(1)}% O&M; ${life} years; ${(rate * 100).toFixed(1)}% WACC.${exclusion} Gross payback excludes O&M, rent, tax, debt and degradation.`;
-        list.innerHTML = rows.slice(0, 10).map((row, index) => `<article class="ranking-row"><strong>#${index + 1} ${row.id}</strong> · scenario score ${Math.round(row.score * 100)}%<br><small>${row.capacityKwp.toFixed(1)} kWp · ${Math.round(row.annualEnergyKwh).toLocaleString('en-IN')} kWh/year · CAPEX ₹${Math.round(row.capex).toLocaleString('en-IN')} · annual value ₹${Math.round(row.annualValue).toLocaleString('en-IN')}<br>Inputs: ₹${row.capexPerKwp.toLocaleString('en-IN')}/kWp · ₹${row.energyValue}/kWh<br>LCOE ₹${row.lcoe.toFixed(2)}/kWh · gross payback ${row.grossPayback.toFixed(1)} years · annual O&M ₹${Math.round(row.annualOpex).toLocaleString('en-IN')}</small></article>`).join('');
+        status.textContent = `Ranked by profitability index from a ${life}-year discounted cash-flow simulation, then NPV. Government capacity bands are applied per building; ${(opexRate * 100).toFixed(1)}% O&M, ${(degradationRate * 100).toFixed(1)}% degradation and ${(rate * 100).toFixed(1)}% WACC are shared assumptions.${exclusion} Rent, tax and debt are excluded.`;
+        list.innerHTML = rows.slice(0, 10).map((row, index) => `<article class="ranking-row"><strong>#${index + 1} ${row.id}</strong> · profitability index ${row.profitabilityIndex.toFixed(2)}<br><small>${row.capacityKwp.toFixed(1)} kWp · ${Math.round(row.annualEnergyKwh).toLocaleString('en-IN')} kWh first year · CAPEX ₹${Math.round(row.capex).toLocaleString('en-IN')} · first-year value ₹${Math.round(row.annualValue).toLocaleString('en-IN')}<br>Building inputs: ₹${row.capexPerKwp.toLocaleString('en-IN')}/kWp · ₹${row.energyValue}/kWh · O&amp;M ₹${Math.round(row.annualOpex).toLocaleString('en-IN')}/year<br>NPV ${row.npv >= 0 ? '' : '−'}₹${Math.abs(Math.round(row.npv)).toLocaleString('en-IN')} · LCOE ₹${row.lcoe.toFixed(2)}/kWh · net payback ${row.netPayback == null ? 'beyond project life' : row.netPayback.toFixed(1) + ' years'} · gross payback ${row.grossPayback.toFixed(1)} years</small></article>`).join('');
       } catch (error) {
         status.textContent = `Scenario cannot run: ${error.message}`;
         list.textContent = '';
