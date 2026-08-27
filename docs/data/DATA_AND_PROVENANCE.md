@@ -21,6 +21,16 @@ These are candidates, not automatically approved dependencies. Confirm the AOI c
 | grid context | OpenStreetMap and openly published utility layers | distance-to-grid proxy | does not provide hosting capacity or interconnection approval |
 | costs/rent | official benchmark costs, open property listings or local surveys | early economic screening | time-sensitive, biased and often incomplete; show provenance/confidence |
 
+## Copernicus terrain semantics
+
+Copernicus GLO-30 observations enter Helios as `terrain_context_only`. The
+pipeline samples a local 3x3 DEM neighbourhood and records median elevation,
+terrain slope, downslope aspect and local relief. At approximately 30 m
+resolution these values support regional terrain, horizon, drainage, access and
+ground-mounted screening. They must not be presented as roof slope, roof aspect,
+building height or rooftop shading. Rooftop geometry requires finer DSM, stereo,
+LiDAR or image-derived roof-plane evidence.
+
 ## Storage zones
 
 - `data/manifests/`: small, reviewable metadata committed to Git.

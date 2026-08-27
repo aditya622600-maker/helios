@@ -36,6 +36,14 @@ dev = [
   "pytest-cov>=5,<7",
   "ruff>=0.6,<1",
 ]
+ml = [
+  "joblib>=1.4,<2",
+  "numpy>=2,<3",
+  "pandas>=2.2,<3",
+  "pillow>=11,<13",
+  "scikit-learn>=1.5,<2",
+  "torch>=2.7,<3",
+]
 
 [tool.setuptools.packages.find]
 include = ["apps*", "helios*"]

@@ -37,8 +37,6 @@ def convert(source: Path, destination: Path) -> int:
         levels = number(tags.get("building:levels"))
         if height is None and levels is not None:
             height = round(levels * 3.0, 2)
-        if height is None:
-            height = 6.0
         features.append(
             {
                 "type": "Feature",
@@ -46,12 +44,12 @@ def convert(source: Path, destination: Path) -> int:
                     "osm_way_id": int(way.attrib["id"]),
                     "building_type": tags["building"],
                     "name": tags.get("name") or None,
-                    "height_m": round(height, 2),
+                    "height_m": round(height, 2) if height is not None else None,
                     "height_source": "OSM height tag"
                     if tags.get("height")
                     else "OSM building:levels × 3 m"
                     if levels is not None
-                    else "display fallback; OSM height unavailable",
+                    else "OSM height unavailable",
                     "building_levels": levels,
                     "source_dataset": "OpenStreetMap",
                     "source_license": "ODbL 1.0",
@@ -70,7 +68,7 @@ def convert(source: Path, destination: Path) -> int:
                     "description": "Bounded OSM building extract for exploratory 3D visualization",
                     "retrieved_from": "https://api.openstreetmap.org/api/0.6/map",
                     "retrieval_bbox": [73.055, 19.030, 73.085, 19.065],
-                    "height_policy": "OSM height, then building levels × 3 m, then 6 m display fallback",
+                    "height_policy": "OSM height, then building levels × 3 m; missing values remain null",
                 },
                 "features": features,
             },

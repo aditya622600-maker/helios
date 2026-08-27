@@ -62,7 +62,7 @@
     <input id="pitch" type="range" min="35" max="75" value="55">
     <label for="terrainExaggeration">Terrain exaggeration <output id="terrainValue">1.15×</output></label>
     <input id="terrainExaggeration" type="range" min="0.5" max="2.5" step="0.05" value="1.15">
-    <div class="legend">Click a building to inspect its OSM height and base elevation. Yellow outlines are Person 1 candidates when served over HTTP.</div>
+    <div class="legend">Click a building to inspect its fused height and provenance. Color runs from low-rise cyan through high-rise violet/red; gray outlines mean height is unavailable.</div>
     <div id="digitalTwinStatus" class="status" data-state="idle">
       <strong>High-fidelity AOI</strong><br>
       <span id="digitalTwinStatusText">Draw a polygon to stream the configured Cesium ion 3D Tiles asset. Rough buildings remain available as the fallback.</span>
@@ -84,7 +84,7 @@
   <button id="showControls" class="controls-panel-toggle" aria-label="Show Helios controls" hidden>Show controls</button>
   <aside id="analysisPanel" class="analysis-panel" aria-label="Candidate analysis">
     <div class="panel-heading"><h2>Candidate analysis</h2><button id="hideAnalysis" aria-label="Hide analysis panel">Hide</button></div>
-    <p>Choose a factor to compare buildings in the selected region. Footprints and tagged heights come from the bundled OSM-derived GeoJSON. Irradiance and yield are currently labeled proxies, not measured database values.</p>
+    <p>Choose a factor to compare buildings in the selected region. Footprints are fused from Google, Microsoft, and Overture; heights combine published vector values with DLR WSF3D context. Irradiance and yield remain labeled proxies.</p>
     <label for="factorSelect">Rank buildings by</label>
     <select id="factorSelect"><option value="height">Building height</option><option value="usable_area">Usable rooftop area</option><option value="irradiance">Irradiance</option><option value="yield">Annual solar yield</option></select>
     <button id="runAnalysis">Run selected-region analysis</button>
@@ -144,7 +144,7 @@
         map.addLayer({
           id: 'local-buildings-3d', source: 'local-buildings-3d', type: 'fill-extrusion',
           paint: {
-            'fill-extrusion-color': '#60a5fa',
+            'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['to-number', ['get', 'height_m']], 0], 0, '#cbd5e1', 8, '#38bdf8', 20, '#2563eb', 50, '#7c3aed', 100, '#be123c'],
             'fill-extrusion-height': ['coalesce', ['to-number', ['get', 'height_m']], 0],
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': 0.88,
@@ -158,6 +158,12 @@
         map.addLayer({ id: 'analysis-highlight', source: 'analysis-highlight', type: 'line', paint: { 'line-color': '#facc15', 'line-width': 5, 'line-opacity': 1 } });
         fetch('./data/merged_buildings_3d.geojson').then(response => response.json()).then(data => { all3DBuildings = data; apply3DSelection(selectionFeature); }).catch(() => {});
         map.setLayoutProperty('osm-buildings', 'visibility', 'visible');
+        map.on('click', 'local-buildings-3d', event => {
+          const p = event.features[0].properties;
+          new maplibregl.Popup().setLngLat(event.lngLat).setHTML(buildingPopup(p)).addTo(map);
+        });
+        map.on('mouseenter', 'local-buildings-3d', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'local-buildings-3d', () => { map.getCanvas().style.cursor = ''; });
         map.addSource('person1', { type: 'geojson', data: './data/candidate_buildings.geojson' });
         map.addLayer({ id: 'person1-footprints', type: 'line', source: 'person1', paint: { 'line-color': '#fbbf24', 'line-width': 2, 'line-opacity': 0.95 } });
       }
@@ -201,6 +207,12 @@
     };
     const selectionStatus = document.getElementById('selectionStatus');
     function showSelectionStatus(text) { selectionStatus.textContent = text; }
+    function buildingPopup(p) {
+      const height = Number(p.height_m);
+      const sources = String(p.height_observation_sources || 'unavailable').replace(/[\[\]"]/g, '').replaceAll(',', ', ');
+      const datasets = String(p.source_datasets || 'unavailable').replace(/[\[\]"]/g, '').replaceAll(',', ', ');
+      return `<strong>Helios fused building</strong><br>height: ${Number.isFinite(height) ? height.toFixed(1) + ' m' : 'unavailable'}<br>height quality: ${p.height_quality || 'unavailable'}<br>height evidence: ${sources}<br>footprint datasets: ${datasets}`;
+    }
     function rectangleFeature(a, b) {
       const west = Math.min(a[0], b[0]), east = Math.max(a[0], b[0]);
       const south = Math.min(a[1], b[1]), north = Math.max(a[1], b[1]);
@@ -411,7 +423,7 @@
         if (map.getSource('usable-roofs-3d')) map.getSource('usable-roofs-3d').setData({ type: 'FeatureCollection', features: visible.map(toUsableRoof) });
         map.setLayoutProperty('local-buildings-3d', 'visibility', feature ? 'visible' : 'none');
         if (map.getLayer('usable-roofs-3d')) map.setLayoutProperty('usable-roofs-3d', 'visibility', feature ? 'visible' : 'none');
-        if (map.getLayer('local-buildings-3d')) map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', '#60a5fa');
+        if (map.getLayer('local-buildings-3d')) map.setPaintProperty('local-buildings-3d', 'fill-extrusion-color', ['interpolate', ['linear'], ['coalesce', ['to-number', ['get', 'height_m']], 0], 0, '#cbd5e1', 8, '#38bdf8', 20, '#2563eb', 50, '#7c3aed', 100, '#be123c']);
         if (map.getLayer('usable-roofs-3d')) map.setPaintProperty('usable-roofs-3d', 'fill-extrusion-color', '#0ea5e9');
         document.getElementById('rankingList').textContent = feature ? `${visible.length} buildings in the selected region. Choose a factor and run analysis.` : 'Choose a factor and run analysis.';
         map.triggerRepaint();
@@ -469,7 +481,7 @@
       const center = ring.reduce((acc, point) => [acc[0] + point[0] / ring.length, acc[1] + point[1] / ring.length], [0, 0]);
       map.flyTo({ center, zoom: Math.max(map.getZoom(), 17), speed: 0.8 });
       const p = feature.properties;
-      new maplibregl.Popup().setLngLat(center).setHTML(`<strong>Selected ranked building</strong><br>ID: ${p.osm_way_id || p.candidate_id || 'not available'}<br>merged height: ${p.height_m || 'not available'} m<br>height provenance: ${p.height_source || 'not available'}`).addTo(map);
+      new maplibregl.Popup().setLngLat(center).setHTML(buildingPopup(p)).addTo(map);
     }
     function pointInRing(point, ring) {
       for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -551,7 +563,7 @@
         });
         selectionMap.on('click', 'selection-building-fill', event => {
           const p = event.features[0].properties;
-          new maplibregl.Popup().setLngLat(event.lngLat).setHTML(`<strong>Merged building footprint</strong><br>ID: ${p.osm_way_id || p.candidate_id || 'not available'}<br>merged height: ${p.height_m || 'not available'} m<br>OSM height: ${p.osm_height_m || 'not available'} m<br>Google height: ${p.google_temporal_height_m || 'not available'} m<br>height provenance: ${p.height_source || 'not available'}`).addTo(selectionMap);
+          new maplibregl.Popup().setLngLat(event.lngLat).setHTML(buildingPopup(p)).addTo(selectionMap);
         });
         selectionMap.on('click', 'selection-osm-building-fill', event => {
           const p = event.features[0].properties;
