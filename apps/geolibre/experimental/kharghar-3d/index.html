@@ -70,10 +70,9 @@
     <label for="terrainExaggeration">Terrain exaggeration <output id="terrainValue">1.15×</output></label>
     <input id="terrainExaggeration" type="range" min="0.5" max="2.5" step="0.05" value="1.15">
     <div class="legend">Click a building to inspect its fused height and provenance. Color runs from low-rise cyan through high-rise violet/red; gray outlines mean height is unavailable.</div>
-    <div id="digitalTwinStatus" class="status" data-state="idle">
-      <strong>High-fidelity AOI</strong><br>
-      <span id="digitalTwinStatusText">Draw a polygon to stream the configured Cesium ion 3D Tiles asset. Rough buildings remain available as the fallback.</span>
-      <button id="retryDigitalTwin" type="button" hidden>Retry 3D tiles</button>
+    <div id="digitalTwinStatus" class="status" data-state="disabled">
+      <strong>3D building view</strong><br>
+      <span id="digitalTwinStatusText">High-fidelity streaming is disabled. The stable MapLibre building layer remains active for AOI review.</span>
     </div>
     </section>
     <section id="selectionControls" hidden>
@@ -123,12 +122,7 @@
   <button id="showAnalysis" class="analysis-panel-toggle" aria-label="Show analysis panel" hidden>Show rankings</button>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
-  <div id="ionAttribution" class="ion-attribution" hidden>
-    3D context delivered by <a href="https://cesium.com/platform/cesium-ion/" target="_blank" rel="noreferrer">Cesium ion</a>
-    <span id="ionAssetAttribution"></span>
-  </div>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://unpkg.com/deck.gl@9.1.14/dist.min.js"></script>
   <script>
     // MapLibre remains the viewer. deck.gl is only the bridge that renders a
     // Cesium ion 3D Tiles asset in the synchronized MapLibre camera.
@@ -242,7 +236,6 @@
       ['OpenStreetMap / OpenFreeMap', 'map context', 'context only'],
       ['Sentinel-2 cloudless 2024', 'imagery', 'context only'],
       ['Esri World Imagery', 'imagery', 'context only'],
-      ['Cesium ion 3D Tiles', 'optional visual context', 'AOI streamed when configured']
     ];
     // Add a factor here when a new model/data product becomes available.
     const ANALYSIS_FACTORS = {
@@ -286,8 +279,6 @@
       selectionFeature = feature;
       selectionMap.getSource('selection').setData(feature || { type: 'FeatureCollection', features: [] });
       apply3DSelection(feature);
-      if (feature) focusDigitalTwinAOI(feature);
-      updateDigitalTwin(feature);
       const n = feature ? feature.geometry.coordinates[0].length - 1 : 0;
       showSelectionStatus(feature ? `${feature.properties.selection_mode} selected · ${n} corners · ready for analysis` : 'No region selected.');
     }
@@ -668,7 +659,6 @@
     // Rectangle support remains implemented for a future UI toggle, but is intentionally hidden for now.
     document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then click the first point again or double-click to finish.'); });
     document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateDraft([]); updateSelection(null); });
-    document.getElementById('retryDigitalTwin').addEventListener('click', () => { if (selectionFeature) updateDigitalTwin(selectionFeature, true); });
     document.getElementById('runAnalysis').addEventListener('click', runAnalysis);
     document.getElementById('factorSelect').addEventListener('change', runAnalysis);
     document.getElementById('rankingList').addEventListener('click', event => { const button = event.target.closest('.ranking-row'); if (button) button.focus(); });
