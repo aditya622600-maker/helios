@@ -44,8 +44,6 @@
     .status[data-state="ready"] { border-left: 3px solid #22c55e; }
     .status[data-state="error"] { border-left: 3px solid #ef4444; }
     .status button { margin-top: 7px; }
-    .ion-attribution { position: absolute; z-index: 5; left: 50%; bottom: 7px; transform: translateX(-50%); max-width: min(680px, calc(100vw - 28px)); padding: 5px 9px; border-radius: 5px; background: #0f172add; color: #e2e8f0; font-size: 10px; text-align: center; }
-    .ion-attribution a { color: #7dd3fc; }
     .maplibregl-popup-content { color: #0f172a; font-size: 12px; }
     details { margin-top: 10px; padding: 8px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; }
     summary { color: #e2e8f0; font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -70,11 +68,6 @@
     <label for="terrainExaggeration">Terrain exaggeration <output id="terrainValue">1.15×</output></label>
     <input id="terrainExaggeration" type="range" min="0.5" max="2.5" step="0.05" value="1.15">
     <div class="legend">Click a building to inspect its fused height and provenance. Color runs from low-rise cyan through high-rise violet/red; gray outlines mean height is unavailable.</div>
-    <div id="digitalTwinStatus" class="status" data-state="idle">
-      <strong>High-fidelity AOI</strong><br>
-      <span id="digitalTwinStatusText">Draw a polygon to stream the configured Cesium ion 3D Tiles asset. Rough buildings remain available as the fallback.</span>
-      <button id="retryDigitalTwin" type="button" hidden>Retry 3D tiles</button>
-    </div>
     </section>
     <section id="selectionControls" hidden>
       <div class="legend">This is the flat map used to draw your analysis area. The polygon outline and corner points remain visible while you draw.</div>
@@ -142,15 +135,8 @@
   <button id="showAnalysis" class="analysis-panel-toggle" aria-label="Show analysis panel" hidden>Show rankings</button>
   <div id="map" class="view active" role="application" aria-label="Interactive 3D map of the Kharghar sandbox"></div>
   <div id="selectionMap" class="view" role="application" aria-label="Flat map for selecting a Helios analysis region"></div>
-  <div id="ionAttribution" class="ion-attribution" hidden>
-    3D context delivered by <a href="https://cesium.com/platform/cesium-ion/" target="_blank" rel="noreferrer">Cesium ion</a>
-    <span id="ionAssetAttribution"></span>
-  </div>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://unpkg.com/deck.gl@9.1.14/dist.min.js"></script>
   <script>
-    // MapLibre remains the viewer. deck.gl is only the bridge that renders a
-    // Cesium ion 3D Tiles asset in the synchronized MapLibre camera.
     const map = new maplibregl.Map({
       container: 'map',
       center: [73.0697, 19.0468],
@@ -223,8 +209,6 @@
         new maplibregl.Popup({ closeButton: false, closeOnClick: false }).setLngLat(event.lngLat).setHTML(`<strong>Solar rooftop</strong><br>roof area: ${p.roof_area_m2} m²<br>usable rooftop area: ${p.usable_roof_area_m2} m²<br>usable estimate: ${Math.round(USABLE_ROOF_FRACTION * 100)}%`).addTo(map);
       });
       map.on('mouseleave', 'usable-roofs-3d', () => { map.getCanvas().style.cursor = ''; document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove()); });
-      // A failed optional 3D Tiles layer must never prevent the selector,
-      // rankings, or local buildings from booting.
     });
     let selectionMap;
     let selectionMode = null;
@@ -235,12 +219,6 @@
     let activeGovernmentEconomicProfile = null;
     let governmentEconomicProfilesPromise = null;
     let economicProfileRevision = 0;
-    let digitalTwinOverlay = null;
-    let cesiumConfigPromise = null;
-    let cesiumLoaderPromise = null;
-    let digitalTwinRevision = 0;
-    let photorealisticLayerVisibility = null;
-    let latestDigitalTwinCredits = new Set();
     const USABLE_ROOF_FRACTION = 0.70;
     const SOLAR_RESOURCE = {
       source: 'NASA POWER Daily API', year: 2025, latitude: 19.0464, longitude: 73.069,
@@ -263,8 +241,7 @@
       ['DLR WSF3D area, fraction, volume', 'additional morphology', 'registered; not used here'],
       ['OpenStreetMap / OpenFreeMap', 'map context', 'context only'],
       ['Sentinel-2 cloudless 2024', 'imagery', 'context only'],
-      ['Esri World Imagery', 'imagery', 'context only'],
-      ['Cesium ion 3D Tiles', 'optional visual context', 'AOI streamed when configured']
+      ['Esri World Imagery', 'imagery', 'context only']
     ];
     // Add a factor here when a new model/data product becomes available.
     const ANALYSIS_FACTORS = {
@@ -309,176 +286,14 @@
       selectionMap.getSource('selection').setData(feature || { type: 'FeatureCollection', features: [] });
       apply3DSelection(feature);
       populateGovernmentEconomicInputs(feature);
-      if (feature) focusDigitalTwinAOI(feature);
-      updateDigitalTwin(feature);
+      if (feature) focusSelectedAOI(feature);
       const n = feature ? feature.geometry.coordinates[0].length - 1 : 0;
       showSelectionStatus(feature ? `${feature.properties.selection_mode} selected · ${n} corners · ready for analysis` : 'No region selected.');
     }
-    function focusDigitalTwinAOI(feature) {
+    function focusSelectedAOI(feature) {
       const points = feature.geometry.coordinates[0];
       const bounds = points.reduce((b, point) => b.extend(point), new maplibregl.LngLatBounds(points[0], points[0]));
       map.fitBounds(bounds, { padding: { top: 90, right: 330, bottom: 70, left: 330 }, maxZoom: 17.5, duration: 900 });
-    }
-    function digitalTwinBounds(feature) {
-      const ring = feature.geometry.coordinates[0];
-      return [
-        Math.min(...ring.map(point => point[0])),
-        Math.min(...ring.map(point => point[1])),
-        Math.max(...ring.map(point => point[0])),
-        Math.max(...ring.map(point => point[1]))
-      ];
-    }
-    function setDigitalTwinStatus(state, text, retry = false) {
-      const status = document.getElementById('digitalTwinStatus');
-      status.dataset.state = state;
-      document.getElementById('digitalTwinStatusText').textContent = text;
-      document.getElementById('retryDigitalTwin').hidden = !retry;
-    }
-    function getDigitalTwinOverlay() {
-      if (!digitalTwinOverlay) {
-        if (!window.deck?.MapboxOverlay) throw new Error('The deck.gl MapLibre bridge did not load.');
-        digitalTwinOverlay = new deck.MapboxOverlay({ interleaved: false, layers: [] });
-        map.addControl(digitalTwinOverlay);
-      }
-      return digitalTwinOverlay;
-    }
-    async function getCesiumConfig(force = false) {
-      if (force) cesiumConfigPromise = null;
-      if (!cesiumConfigPromise) {
-        cesiumConfigPromise = fetch('/api/cesium-config', { cache: 'no-store' }).then(async response => {
-          const body = await response.json().catch(() => ({}));
-          if (!response.ok || !body.enabled) throw new Error(body.error || `Runtime configuration returned HTTP ${response.status}.`);
-          return body;
-        });
-      }
-      return cesiumConfigPromise;
-    }
-    async function getCesiumIonLoader() {
-      if (!cesiumLoaderPromise) {
-        cesiumLoaderPromise = import('https://cdn.jsdelivr.net/npm/@loaders.gl/3d-tiles@4.3.4/+esm').then(module => {
-          if (!module.CesiumIonLoader) throw new Error('CesiumIonLoader was not exported by loaders.gl.');
-          return module.CesiumIonLoader;
-        });
-      }
-      return cesiumLoaderPromise;
-    }
-    function showDigitalTwinCredits(assetId) {
-      const attribution = document.getElementById('ionAttribution');
-      const detail = document.getElementById('ionAssetAttribution');
-      const credits = [...latestDigitalTwinCredits].filter(Boolean);
-      const fallback = String(assetId) === '2275207' ? ' · Google Photorealistic 3D Tiles' : ` · asset ${assetId}`;
-      detail.textContent = credits.length ? ` · ${credits.join(' · ')}` : fallback;
-      attribution.hidden = false;
-    }
-    function collectDigitalTwinCredit(tile) {
-      const candidates = [
-        tile?.content?.gltf?.json?.asset?.copyright,
-        tile?.content?.gltf?.asset?.copyright,
-        tile?.content?.metadata?.copyright,
-        tile?.header?.content?.copyright
-      ];
-      candidates.filter(Boolean).forEach(value => String(value).split(';').forEach(credit => latestDigitalTwinCredits.add(credit.trim())));
-    }
-    function setPhotorealisticBaseMode(enabled) {
-      if (enabled) {
-        if (!photorealisticLayerVisibility) {
-          photorealisticLayerVisibility = new Map();
-          map.getStyle().layers.forEach(layer => {
-            if (['aoi-3d-fill', 'aoi-3d-line', 'analysis-highlight'].includes(layer.id)) return;
-            const visibility = map.getLayoutProperty(layer.id, 'visibility') || 'visible';
-            photorealisticLayerVisibility.set(layer.id, visibility);
-            map.setLayoutProperty(layer.id, 'visibility', 'none');
-          });
-        }
-        map.setTerrain(null);
-        return;
-      }
-      if (photorealisticLayerVisibility) {
-        photorealisticLayerVisibility.forEach((visibility, layerId) => {
-          if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visibility);
-        });
-        photorealisticLayerVisibility = null;
-      }
-      if (map.getSource('terrain')) map.setTerrain({ source: 'terrain', exaggeration: Number(document.getElementById('terrainExaggeration').value) });
-      apply3DSelection(selectionFeature);
-    }
-    function digitalTwinAnnotation(feature, revision) {
-      return new deck.GeoJsonLayer({
-        id: `helios-aoi-annotation-${revision}`,
-        data: feature,
-        filled: true,
-        stroked: true,
-        getFillColor: [254, 243, 199, 42],
-        getLineColor: [245, 158, 11, 255],
-        getLineWidth: 3,
-        lineWidthUnits: 'pixels',
-        parameters: { depthTest: false },
-        pickable: false
-      });
-    }
-    async function updateDigitalTwin(feature, force = false) {
-      const revision = ++digitalTwinRevision;
-      latestDigitalTwinCredits = new Set();
-      if (!feature) {
-        if (digitalTwinOverlay) digitalTwinOverlay.setProps({ layers: [] });
-        document.getElementById('ionAttribution').hidden = true;
-        setPhotorealisticBaseMode(false);
-        setDigitalTwinStatus('idle', 'Draw a polygon to stream the configured Cesium ion 3D Tiles asset. Rough buildings remain available as the fallback.');
-        return;
-      }
-      setPhotorealisticBaseMode(false);
-      setDigitalTwinStatus('loading', 'AOI selected. Contacting the Cesium ion asset and keeping rough buildings visible until a real tile arrives.');
-      try {
-        const [config, CesiumIonLoader] = await Promise.all([getCesiumConfig(force), getCesiumIonLoader()]);
-        if (revision !== digitalTwinRevision) return;
-        const overlay = getDigitalTwinOverlay();
-        const bounds = digitalTwinBounds(feature);
-        let firstTileSeen = false;
-        const tileLayer = new deck.Tile3DLayer({
-          id: `helios-ion-3d-tiles-${revision}`,
-          data: `https://assets.cesium.com/${encodeURIComponent(config.assetId)}/tileset.json`,
-          loader: CesiumIonLoader,
-          loadOptions: {
-            'cesium-ion': { accessToken: config.accessToken },
-            tileset: { throttleRequests: true }
-          },
-          extensions: [new deck.ClipExtension()],
-          clipBounds: bounds,
-          pickable: '3d',
-          operation: 'terrain+draw',
-          onTileLoad: tile => {
-            if (revision !== digitalTwinRevision) return;
-            collectDigitalTwinCredit(tile);
-            if (!firstTileSeen) {
-              firstTileSeen = true;
-              setPhotorealisticBaseMode(true);
-              showDigitalTwinCredits(config.assetId);
-              setDigitalTwinStatus('ready', 'High-fidelity tiles are rendering in MapLibre. Loading is AOI-gated and clipped to the polygon bounding envelope.');
-            } else {
-              showDigitalTwinCredits(config.assetId);
-            }
-          },
-          onTileError: error => {
-            if (revision !== digitalTwinRevision || firstTileSeen) return;
-            setDigitalTwinStatus('error', `The ion asset was reached, but its tile failed: ${error?.message || error || 'unknown tile error'}. Rough buildings are still active.`, true);
-          },
-          onError: error => {
-            if (revision !== digitalTwinRevision) return true;
-            setDigitalTwinStatus('error', `The 3D layer failed: ${error?.message || error}. Rough buildings are still active.`, true);
-            return true;
-          }
-        });
-        overlay.setProps({ layers: [tileLayer, digitalTwinAnnotation(feature, revision)] });
-        window.setTimeout(() => {
-          if (revision !== digitalTwinRevision || firstTileSeen) return;
-          setDigitalTwinStatus('error', 'No renderable 3D tile arrived within 25 seconds. Check the token restrictions, asset access, and whether this asset covers the selected AOI. Rough buildings are still active.', true);
-        }, 25000);
-      } catch (error) {
-        if (revision !== digitalTwinRevision) return;
-        if (digitalTwinOverlay) digitalTwinOverlay.setProps({ layers: [digitalTwinAnnotation(feature, revision)] });
-        setPhotorealisticBaseMode(false);
-        setDigitalTwinStatus('error', `${error.message} Rough buildings are still active.`, true);
-      }
     }
     function apply3DSelection(feature) {
       if (!map.getLayer('osm-buildings') && !map.getLayer('local-buildings-3d')) return;
@@ -854,7 +669,6 @@
     // Rectangle support remains implemented for a future UI toggle, but is intentionally hidden for now.
     document.getElementById('polygonTool').addEventListener('click', () => { selectionMode = 'polygon'; selectionPoints = []; updateDraft([]); showSelectionStatus('Polygon: click corners, then click the first point again or double-click to finish.'); });
     document.getElementById('clearSelection').addEventListener('click', () => { selectionMode = null; selectionPoints = []; updateDraft([]); updateSelection(null); });
-    document.getElementById('retryDigitalTwin').addEventListener('click', () => { if (selectionFeature) updateDigitalTwin(selectionFeature, true); });
     document.getElementById('runAnalysis').addEventListener('click', runAnalysis);
     document.getElementById('factorSelect').addEventListener('change', runAnalysis);
     document.getElementById('rankingTab').addEventListener('click', () => setAnalysisTab('ranking'));
